@@ -100,25 +100,16 @@ const AGENTS = [
 
 // ── Utility: call Claude API ──────────────────────────────────────────────────
 async function askAgent(agent, messages) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/ask-agent", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      // Key removed before pushing to GitHub — do not hardcode secrets in source.
-      // Route this through a Netlify function (or other backend) that holds the key server-side.
-      "x-api-key": "",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: agent.systemPrompt,
+      systemPrompt: agent.systemPrompt,
       messages,
     }),
   });
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  if (data.error) throw new Error(data.error.message || data.error);
   return data.content.map(b => b.text || "").join("");
 }
 
