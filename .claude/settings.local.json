@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(netlify deploy *)",
+      "Bash(npx netlify *)",
+      "Bash(grep -n \"^  [a-z_]*: {$\" src/MissionControl.jsx)",
+      "Skill(run)",
+      "Bash(curl *)",
+      "Bash(brew --version)",
+      "Bash(brew install *)"
+    ]
+  }
+}
