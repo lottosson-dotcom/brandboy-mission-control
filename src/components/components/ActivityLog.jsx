@@ -1,4 +1,4 @@
-
+jsx
 import { useState, useEffect } from 'react';
 import { getActivityLog, logActivity, getAgentColor, timeAgo } from '../lib/activityLog';
 
@@ -85,8 +85,8 @@ export default function ActivityLog() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(log => (
-            <div key={log.id} style={{ background: '#1f2937', borderLeft: `4px solid ${log.color || '#6b7280'}`, padding: '12px 16px', borderjsx
-Radius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div key={log.id} style={{ background: '#111827', borderLeft: `4px solid ${log.color || '#6b7280'}`, padding: '12px 16px', borderRadius: '6px', display:jsx
+flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: log.color || '#6b7280', fontWeight: 'bold', marginRight: '12px' }}>{log.agent_name}</span>
                 <span style={{ color: '#f3f4f6', marginRight: '12px' }}>{log.action}</span>
