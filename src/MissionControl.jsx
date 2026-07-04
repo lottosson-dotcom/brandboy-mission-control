@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-
+import { saveMemory, getMemories } from "./lib/agentMemory";
 // ── Brandboy palette & design tokens ──────────────────────────────────────────
 const C = {
   black:   "#0A0A0A",
@@ -532,6 +532,18 @@ export default function MissionControl() {
     try {
       const apiMsgs = newMsgs.map(m => ({ role: m.role, content: m.content }));
       const reply = await askAgent(activeAgent, apiMsgs);
+      await saveMemory(
+      activeAgent.name,
+      "task",
+      `User: ${text}\n\n${activeAgent.name}: ${reply}`,
+      [activeAgent.focus, activeAgent.id]
+    );
+    await saveMemory(
+      activeAgent.name,
+      "task",
+      `User: ${text}\n\n${activeAgent.name}: ${reply}`,
+      [activeAgent.focus, activeAgent.id]
+    );
       setConversations(c => {
         const cur = c[activeAgent.id].filter(m => !m.pending);
         return {
