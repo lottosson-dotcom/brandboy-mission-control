@@ -96,7 +96,7 @@ strategy","📋 Strategy"],["activity","📡 Activity Log"]].map(([v,label])=><b
 <div style={{marginBottom:12}}><div style={{fontSize:10,color:"#888",letterSpacing:1,marginBottom:6}}>CAPABILITIES</div>
 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{a.capabilities.map(c=><span key={c} style={{fontSize:10,background:a.color+"15",color:a.color,border:`1px solid ${a.color}33`,borderRadius:4,padding:"2px 8px"}}>{c}</span>)}</div>
 </div>
-<button onClick={()=>{setActiveAgent(a);setView("chat");}} style={{background:a.color,border:"nonejsx
+<button onClick={()=>{setActiveAgent(a);setView("chat");}} style={{background:a.color,border:"none"
 ",borderRadius:8,color:"#fff",fontWeight:700,fontSize:12,padding:"8px 16px",cursor:"pointer",width:"100%"}}>TALK TO {a.name} →</button>
 </div>)}
 </div>
