@@ -536,14 +536,9 @@ export default function MissionControl() {
       activeAgent.name,
       "task",
       `User: ${text}\n\n${activeAgent.name}: ${reply}`,
-      [activeAgent.focus, activeAgent.id]
+      [activeAgent.focus, activeAgent.id] 
     );
-    await saveMemory(
-      activeAgent.name,
-      "task",
-      `User: ${text}\n\n${activeAgent.name}: ${reply}`,
-      [activeAgent.focus, activeAgent.id]
-    );
+   
       setConversations(c => {
         const cur = c[activeAgent.id].filter(m => !m.pending);
         return {
