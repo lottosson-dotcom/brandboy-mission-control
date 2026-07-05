@@ -680,7 +680,7 @@ export default function MissionControl() {
         gap: 0,
         flexShrink: 0,
       }}>
-        {[["chat","💬 Talk to Agent"], ["agents","🤖 All Agents"], ["strategy","📋 Strategy"]].map(([v, label]) => (
+     {[["chat","💬 Talk to Agent"], ["agents","🤖 All Agents"], ["strategy","📋 Strategy"], ["activity","📡 Activity Log"]].map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{
             background: "none",
             border: "none",
@@ -976,6 +976,7 @@ export default function MissionControl() {
           )}
 
           {/* ═══ STRATEGY VIEW ═══ */}
+            {view === "activity" && <ActivityLog />}
           {view === "strategy" && (
             <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
               <div style={{ marginBottom: 20 }}>
