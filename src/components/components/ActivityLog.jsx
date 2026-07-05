@@ -51,7 +51,7 @@ export default function ActivityLog() {
             <select value={manual.agent_name} onChange={e => setManual({ ...manual, agent_name: e.target.value })} style={{ background: '#111827', color: 'white', border: '1px solid #374151', padding: '8px', borderRadius: '6px' }}>
               {AGENTS.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
-            <input placeholder="Client / Project" value={manual.client_project} onChange={e => setManual({ ...manual, client_project: e.target.value })} style={{ background: '#111827', color: 'white', border: '1px solid #374151', paddingjsx
+            <input placeholder="Client / Project" value={manual.client_project} onChange={e => setManual({ ...manual, client_project: e.target.value })} style={{ background: '#111827', color: 'white', border: '1px solid #374151', padding
 : '8px', borderRadius: '6px' }} />
             <input placeholder="Action (required)" value={manual.action} onChange={e => setManual({ ...manual, action: e.target.value })} style={{ background: '#111827', color: 'white', border: '1px solid #374151', padding: '8px', borderRadius: '6px' }} />
             <input placeholder="Detail" value={manual.detail} onChange={e => setManual({ ...manual, detail: e.target.value })} style={{ background: '#111827', color: 'white', border: '1px solid #374151', padding: '8px', borderRadius: '6px' }} />
