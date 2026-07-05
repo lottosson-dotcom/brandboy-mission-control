@@ -1,6 +1,5 @@
 agentMemory.jsjs
-import { supabase } from './supabaseClient'
-
+js  import { supabase } from './supabaseClient.js'
 export async function saveMemory(agentName, memoryType, content, tags = []) {
   const { data, error } = await supabase
     .from('agent_memory')
