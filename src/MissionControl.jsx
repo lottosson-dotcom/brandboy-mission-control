@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { saveMemory, getMemories } from "./lib/agentMemory";
-// ── Brandboy palette & design tokens ──────────────────────────────────────────
+import ActivityLog from "./components/ActivityLog";
 const C = {
   black:   "#0A0A0A",
   charcoal:"#141414",
