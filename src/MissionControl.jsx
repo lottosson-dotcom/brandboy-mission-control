@@ -47,7 +47,7 @@ return(<div style={{minHeight:"100vh",background:"#0A0A0A",color:"#F0F0F0",fontF
 </div>
 </div>
 <div style={{background:"#141414",borderBottom:"1px solid #2A2A2A",padding:"0 24px",display:"flex",gap:0,flexShrink:0}}>
-["agents","🤖 All Agents"],["strategy","📋 Strategy"],["activity","📡 Activity Log"]].map(([v,label])=><button key={v} onClick={()=>setView(v)} style={{background:"none",border:"none",borderBottom:view===v?"2px solid #FF6B2B":"2px solid transparent",color:view===v?"#FF6B2B":"#888",padding:"10px 20px",fontSize:12,fontWeight:view===v?700:400,cursor:"pointer",letterSpacing:0.5}}>{label}</button>)}
+["agents","🤖 All Agents"],[
 strategy","📋 Strategy"],["activity","📡 Activity Log"]].map(([v,label])=><button key={v} onClick={()=>setView(v)} style={{background:"none",border:"none",borderBottom:view===v?"2px solid #FF6B2B":"2px solid transparent",color:view===v?"#FF6B2B":"#888",padding:"10px 20px",fontSize:12,fontWeight:view===v?700:400,cursor:"pointer",letterSpacing:0.5}}>{label}</button>)}
 </div>
 <div style={{flex:1,display:"flex",overflow:"hidden"}}>
