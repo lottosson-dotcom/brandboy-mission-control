@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { saveMemory, getMemories } from "./lib/agentMemory";
-import ActivityLog from "./components/ActivityLog";
+import { saveMemory, getMemories } from "./lib/agentMemory";js";
+import ActivityLog from "./components/ActivityLog.jsx";
 const C = {
   black:   "#0A0A0A",
   charcoal:"#141414",
