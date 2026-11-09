@@ -156,11 +156,3 @@ key into the chat or the code · if in doubt, "save point" first.
 | 15 min | **Live demo of the loop:** Lars adds an agent himself using `add-agent`, previews, says "put it live" |
 | 10 min | **Pick priorities:** walk section 2, Lars picks his top 3                                             |
 | 5 min  | **Who does what:** offer Eric to do phase 2 (and/or any item), or Lars does list C/D himself          |
-
-### Questions for Lars
-
-1. Which agents does he actually use today? Which give bad answers?
-2. Is the live URL shared with anyone else? (affects login choice)
-3. Where do his prospects/contacts live now: spreadsheet, CRM, email?
-4. Would he rather do changes himself, or have Eric do them and just review?
-5. Budget comfort for Anthropic usage per month?
