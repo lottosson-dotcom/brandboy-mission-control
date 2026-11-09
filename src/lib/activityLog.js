@@ -1,27 +1,26 @@
- javascript
-import { supabase } from './supabaseClient';
+import { supabase } from "./supabaseClient.js";
 
 export async function logActivity({ agent_name, action, detail, client_project }) {
-  const { error } = await supabase
-    .from('activity_log')
-    .insert([{
+  const { error } = await supabase.from("activity_log").insert([
+    {
       agent_name,
       action,
       detail,
       client_project,
       color: getAgentColor(agent_name),
-    }]);
-  if (error) console.error('Activity log error:', error);
+    },
+  ]);
+  if (error) console.error("Activity log error:", error);
 }
 
 export async function getActivityLog(limit = 50) {
   const { data, error } = await supabase
-    .from('activity_log')
-    .select('*')
-    .order('created_at', { ascending: false })
+    .from("activity_log")
+    .select("*")
+    .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
-    console.error('Fetch error:', error);
+    console.error("Fetch error:", error);
     return [];
   }
   return data;
@@ -29,14 +28,14 @@ export async function getActivityLog(limit = 50) {
 
 export function getAgentColor(agent_name) {
   const colors = {
-    FORGE:  '#3B82F6',
-    SPARKY: '#F59E0B',
-    REX:    '#EF4444',
-    NOVA:   '#8B5CF6',
-    PIXEL:  '#10B981',
-    SYSTEM: '#6B7280',
+    FORGE: "#3B82F6",
+    SPARKY: "#F59E0B",
+    REX: "#EF4444",
+    NOVA: "#8B5CF6",
+    PIXEL: "#10B981",
+    SYSTEM: "#6B7280",
   };
-  return colors[agent_name?.toUpperCase()] || '#6B7280';
+  return colors[agent_name?.toUpperCase()] || "#6B7280";
 }
 
 export function timeAgo(timestamp) {
