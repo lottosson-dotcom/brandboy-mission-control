@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mission Control for Lars</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 16mm 16mm 18mm 16mm;
+      }
+      :root {
+        --orange: #ff6b2b;
+        --orange-soft: #fff1ea;
+        --orange-dark: #c4471a;
+        --ink: #1d1d1f;
+        --muted: #5f6368;
+        --line: #e6e2de;
+        --paper: #ffffff;
+        --green: #18864b;
+        --green-soft: #e9f6ef;
+        --blue: #2b6cb0;
+        --blue-soft: #eaf2fb;
+        --amber: #a86500;
+        --amber-soft: #fff6e0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          "Segoe UI",
+          "Inter",
+          system-ui,
+          -apple-system,
+          Helvetica,
+          Arial,
+          sans-serif;
+        font-size: 10.5pt;
+        line-height: 1.5;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.2;
+        margin: 0;
+      }
+      h2 {
+        font-size: 17pt;
+        margin: 0 0 4mm;
+      }
+      h2 .num {
+        color: var(--orange);
+        margin-right: 2mm;
+      }
+      h3 {
+        font-size: 11.5pt;
+        margin: 4mm 0 1.5mm;
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+      .keep {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .compact table {
+        font-size: 9pt;
+        margin-bottom: 2mm;
+      }
+      .compact td {
+        padding: 1.1mm 2mm;
+        line-height: 1.35;
+      }
+      .compact h3 {
+        margin: 2.5mm 0 0.5mm;
+        font-size: 11pt;
+      }
+      .compact .lede {
+        margin-bottom: 2mm;
+        font-size: 10.5pt;
+      }
+      .compact h2 {
+        margin-bottom: 2mm;
+      }
+      p {
+        margin: 0 0 2.5mm;
+      }
+      .page {
+        page-break-after: always;
+        break-after: page;
+      }
+      .page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .lede {
+        font-size: 11.5pt;
+        color: var(--muted);
+        margin-bottom: 5mm;
+      }
+      .small {
+        font-size: 9pt;
+        color: var(--muted);
+      }
+
+      /* Cover */
+      .cover {
+        height: 260mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #ff6b2b, #ff9a5c);
+        color: #fff;
+        font-weight: 900;
+        letter-spacing: 1px;
+        border-radius: 6px;
+        padding: 2mm 4mm;
+        font-size: 14pt;
+      }
+      .cover h1 {
+        font-size: 29pt;
+        margin: 14mm 0 4mm;
+        letter-spacing: -0.5px;
+      }
+      .cover h1 span {
+        color: var(--orange);
+      }
+      .cover .sub {
+        font-size: 14pt;
+        color: var(--muted);
+        max-width: 150mm;
+      }
+      .cover-box {
+        background: var(--orange-soft);
+        border-radius: 4mm;
+        padding: 7mm 8mm;
+      }
+      .cover-box h3 {
+        margin-top: 0;
+      }
+      .cover-box ul {
+        margin: 0;
+        padding-left: 5mm;
+      }
+      .cover-box li {
+        margin-bottom: 1.5mm;
+      }
+      .meta {
+        font-size: 9.5pt;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        padding-top: 4mm;
+      }
+
+      /* Cards */
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4mm;
+      }
+      .grid3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 3.5mm;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 3mm;
+        padding: 4mm 4.5mm;
+        break-inside: avoid;
+      }
+      .card h3 {
+        margin-top: 0;
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .good {
+        background: var(--green-soft);
+        border-color: #cfe9da;
+      }
+      .good h3 {
+        color: var(--green);
+      }
+      .info {
+        background: var(--blue-soft);
+        border-color: #d3e3f5;
+      }
+      .info h3 {
+        color: var(--blue);
+      }
+      .warm {
+        background: var(--amber-soft);
+        border-color: #f3e2b5;
+      }
+      .warm h3 {
+        color: var(--amber);
+      }
+      .icon {
+        font-size: 15pt;
+        display: block;
+        margin-bottom: 1mm;
+      }
+
+      /* Tables */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1mm 0 4mm;
+        font-size: 9.8pt;
+      }
+      th {
+        text-align: left;
+        font-size: 8.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--muted);
+        border-bottom: 2px solid var(--line);
+        padding: 1.5mm 2mm;
+      }
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 2mm;
+        vertical-align: top;
+      }
+      tr {
+        break-inside: avoid;
+      }
+      .pill {
+        display: inline-block;
+        border-radius: 10px;
+        padding: 0.3mm 2.4mm;
+        font-size: 8pt;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .p-done {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .p-s {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .p-m {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+      .p-l {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+      .star {
+        color: var(--orange);
+        font-weight: 900;
+      }
+
+      /* Diagram */
+      .diagram {
+        border: 1px solid var(--line);
+        border-radius: 3mm;
+        padding: 3mm;
+        margin-bottom: 4mm;
+      }
+      .diagram svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      /* Steps */
+      .steps {
+        counter-reset: s;
+        list-style: none;
+        padding: 0;
+        margin: 0 0 4mm;
+      }
+      .steps li {
+        counter-increment: s;
+        position: relative;
+        padding: 0 0 2.5mm 10mm;
+      }
+      .steps li::before {
+        content: counter(s);
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 6.5mm;
+        height: 6.5mm;
+        border-radius: 50%;
+        background: var(--orange);
+        color: #fff;
+        font-weight: 800;
+        font-size: 9pt;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .quote {
+        border-left: 3px solid var(--orange);
+        padding: 1mm 0 1mm 4mm;
+        color: var(--muted);
+        font-style: italic;
+        margin: 2mm 0 4mm;
+      }
+      .footer-note {
+        margin-top: 6mm;
+        padding-top: 3mm;
+        border-top: 1px solid var(--line);
+        font-size: 9pt;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ============================ COVER ============================ -->
+    <section class="page cover">
+      <div>
+        <span class="badge">BB</span>
+        <h1>Mission Control:<br /><span>where it's at, and where it could go</span></h1>
+        <p class="sub">
+          Hey Lars! I had a proper dig through Mission Control. Here's what I loved, what I tidied
+          up, how it all hangs together, and a heap of ideas for what's next.
+        </p>
+      </div>
+
+      <div class="cover-box">
+        <h3>The quick version</h3>
+        <ul>
+          <li>
+            <b>Mate, this is a really good idea.</b> Seven AI agents, each with its own job, in a
+            slick Brandboy-branded command centre. You've nailed the concept.
+          </li>
+          <li>
+            <b>I've done a bit of tidying under the bonnet.</b> Your AI account is now locked behind
+            a passcode, the code's cleaned up, and I've given Claude some "safety rails" so you
+            can't break anything.
+          </li>
+          <li>
+            <b>You can keep building it yourself</b> just by chatting to Claude in plain English. No
+            coding. Nothing goes live until you say so, and nothing ever gets lost.
+          </li>
+          <li>
+            <b>There's some really fun stuff we could do next:</b> agents that find real tenders on
+            the web, remember your clients, and send you a morning brief with your coffee.
+          </li>
+        </ul>
+      </div>
+
+      <div class="meta">For Lars · from Eric · November 2026</div>
+    </section>
+
+    <!-- ============================ WHAT'S GOOD ============================ -->
+    <section class="page">
+      <h2><span class="num">1</span>What you've built</h2>
+      <p class="lede">
+        Mission Control is one web page where you hand tasks to a team of AI specialists. Each one
+        is Claude (Anthropic's AI) with its own role and instructions. Here's the crew:
+      </p>
+
+      <div class="grid3" style="margin-bottom: 5mm">
+        <div class="card">
+          <span class="icon">🔍</span>
+          <h3>SCOUT</h3>
+          <p class="small">Finds and researches prospects</p>
+        </div>
+        <div class="card">
+          <span class="icon">✍️</span>
+          <h3>COMPOSER</h3>
+          <p class="small">Writes outreach emails and follow-ups</p>
+        </div>
+        <div class="card">
+          <span class="icon">🎯</span>
+          <h3>HUNTER</h3>
+          <p class="small">Tenders, DAs, project opportunities</p>
+        </div>
+        <div class="card">
+          <span class="icon">⚙️</span>
+          <h3>OPS</h3>
+          <p class="small">Checklists, suppliers, risk registers</p>
+        </div>
+        <div class="card">
+          <span class="icon">📈</span>
+          <h3>RANKR</h3>
+          <p class="small">SEO for brandboy.com.au</p>
+        </div>
+        <div class="card">
+          <span class="icon">🗂️</span>
+          <h3>NEXUS</h3>
+          <p class="small">Pipeline and lead scoring</p>
+        </div>
+      </div>
+
+      <h3>What I really like about it</h3>
+      <div class="grid2">
+        <div class="card good">
+          <h3>✓ The idea is spot on</h3>
+          <p>
+            Giving each agent a name and a clear job is exactly how people get real value out of AI.
+            Way better than one big chat box.
+          </p>
+        </div>
+        <div class="card good">
+          <h3>✓ It looks the part</h3>
+          <p>
+            Strong Brandboy branding, that dark "command centre" vibe, and the one-click quick tasks
+            make it really easy to pick up and use.
+          </p>
+        </div>
+        <div class="card good">
+          <h3>✓ Good security instincts</h3>
+          <p>
+            You'd already moved the Anthropic key off the page and into a server function. Honestly,
+            loads of people miss that one. Nice work.
+          </p>
+        </div>
+        <div class="card good">
+          <h3>✓ Solid foundations</h3>
+          <p>
+            GitHub, Netlify, Supabase and React are the same tools the pros use. Nothing needs
+            ripping out; I'm just building on what you've got.
+          </p>
+        </div>
+        <div class="card good">
+          <h3>✓ You've got a plan</h3>
+          <p>
+            The Strategy page spells out who does what and when. It's a great roadmap for turning
+            these agents into a proper sales machine.
+          </p>
+        </div>
+        <div class="card good">
+          <h3>✓ Ready to grow</h3>
+          <p>
+            You've already set up the database with tables for agent memory and an activity log.
+            That's the next step teed up.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ HOW IT WORKS ============================ -->
+    <section class="page">
+      <h2><span class="num">2</span>How it all hangs together</h2>
+      <p class="lede">
+        There are five services working together behind the scenes. Here's what each one does, no
+        jargon.
+      </p>
+
+      <div class="diagram">
+        <svg
+          viewBox="0 0 760 360"
+          xmlns="http://www.w3.org/2000/svg"
+          font-family="Segoe UI, Inter, Arial, sans-serif"
+        >
+          <defs>
+            <marker
+              id="a"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
+              <path d="M0,0 L10,5 L0,10 z" fill="#8a8580" />
+            </marker>
+          </defs>
+          <rect
+            x="20"
+            y="40"
+            width="150"
+            height="74"
+            rx="10"
+            fill="#fff1ea"
+            stroke="#ff6b2b"
+            stroke-width="1.5"
+          />
+          <text x="95" y="68" text-anchor="middle" font-size="14" font-weight="700" fill="#1d1d1f">
+            You
+          </text>
+          <text x="95" y="88" text-anchor="middle" font-size="11" fill="#5f6368">
+            browser or phone
+          </text>
+          <text x="95" y="103" text-anchor="middle" font-size="11" fill="#5f6368">
+            using the app
+          </text>
+          <rect
+            x="230"
+            y="20"
+            width="300"
+            height="190"
+            rx="12"
+            fill="#f4fbfa"
+            stroke="#14a39a"
+            stroke-width="1.5"
+          />
+          <text x="245" y="42" font-size="13" font-weight="700" fill="#0f766e">
+            NETLIFY: hosts the app
+          </text>
+          <rect x="250" y="56" width="125" height="70" rx="8" fill="#fff" stroke="#9fd8d3" />
+          <text
+            x="312"
+            y="82"
+            text-anchor="middle"
+            font-size="12.5"
+            font-weight="700"
+            fill="#1d1d1f"
+          >
+            Website
+          </text>
+          <text x="312" y="100" text-anchor="middle" font-size="10.5" fill="#5f6368">
+            what you see
+          </text>
+          <text x="312" y="114" text-anchor="middle" font-size="10.5" fill="#5f6368">
+            and click
+          </text>
+          <rect x="390" y="56" width="125" height="70" rx="8" fill="#fff" stroke="#9fd8d3" />
+          <text
+            x="452"
+            y="82"
+            text-anchor="middle"
+            font-size="12.5"
+            font-weight="700"
+            fill="#1d1d1f"
+          >
+            Server function
+          </text>
+          <text x="452" y="100" text-anchor="middle" font-size="10.5" fill="#5f6368">
+            keeps the AI key safe,
+          </text>
+          <text x="452" y="114" text-anchor="middle" font-size="10.5" fill="#5f6368">
+            checks the passcode 🔒
+          </text>
+          <text x="380" y="160" text-anchor="middle" font-size="10.5" fill="#5f6368">
+            Rebuilds the site automatically
+          </text>
+          <text x="380" y="175" text-anchor="middle" font-size="10.5" fill="#5f6368">
+            every time GitHub changes
+          </text>
+          <rect
+            x="590"
+            y="40"
+            width="150"
+            height="74"
+            rx="10"
+            fill="#f6f1ff"
+            stroke="#8b5cf6"
+            stroke-width="1.5"
+          />
+          <text x="665" y="68" text-anchor="middle" font-size="14" font-weight="700" fill="#1d1d1f">
+            Anthropic
+          </text>
+          <text x="665" y="88" text-anchor="middle" font-size="11" fill="#5f6368">
+            Claude, the brain
+          </text>
+          <text x="665" y="103" text-anchor="middle" font-size="11" fill="#5f6368">
+            behind every agent
+          </text>
+          <rect
+            x="230"
+            y="262"
+            width="150"
+            height="74"
+            rx="10"
+            fill="#f3f3f3"
+            stroke="#555"
+            stroke-width="1.5"
+          />
+          <text
+            x="305"
+            y="290"
+            text-anchor="middle"
+            font-size="14"
+            font-weight="700"
+            fill="#1d1d1f"
+          >
+            GitHub
+          </text>
+          <text x="305" y="310" text-anchor="middle" font-size="11" fill="#5f6368">
+            the code's home,
+          </text>
+          <text x="305" y="325" text-anchor="middle" font-size="11" fill="#5f6368">
+            with full history
+          </text>
+          <rect
+            x="20"
+            y="262"
+            width="150"
+            height="74"
+            rx="10"
+            fill="#fff1ea"
+            stroke="#ff6b2b"
+            stroke-width="1.5"
+          />
+          <text x="95" y="290" text-anchor="middle" font-size="14" font-weight="700" fill="#1d1d1f">
+            Claude Code
+          </text>
+          <text x="95" y="310" text-anchor="middle" font-size="11" fill="#5f6368">
+            on your Mac: makes
+          </text>
+          <text x="95" y="325" text-anchor="middle" font-size="11" fill="#5f6368">
+            changes for you
+          </text>
+          <rect
+            x="440"
+            y="262"
+            width="170"
+            height="74"
+            rx="10"
+            fill="#f2fbf5"
+            stroke="#3ecf8e"
+            stroke-width="1.5"
+            stroke-dasharray="6 4"
+          />
+          <text
+            x="525"
+            y="290"
+            text-anchor="middle"
+            font-size="14"
+            font-weight="700"
+            fill="#1d1d1f"
+          >
+            Supabase
+          </text>
+          <text x="525" y="310" text-anchor="middle" font-size="11" fill="#5f6368">
+            database for memory &amp;
+          </text>
+          <text x="525" y="325" text-anchor="middle" font-size="11" fill="#5f6368">
+            history (coming soon)
+          </text>
+          <line
+            x1="170"
+            y1="86"
+            x2="248"
+            y2="86"
+            stroke="#8a8580"
+            stroke-width="1.6"
+            marker-end="url(#a)"
+          />
+          <line
+            x1="375"
+            y1="91"
+            x2="388"
+            y2="91"
+            stroke="#8a8580"
+            stroke-width="1.6"
+            marker-end="url(#a)"
+          />
+          <line
+            x1="515"
+            y1="86"
+            x2="588"
+            y2="86"
+            stroke="#8a8580"
+            stroke-width="1.6"
+            marker-end="url(#a)"
+            marker-start="url(#a)"
+          />
+          <text x="552" y="78" text-anchor="middle" font-size="10" fill="#5f6368">asks</text>
+          <line
+            x1="170"
+            y1="299"
+            x2="228"
+            y2="299"
+            stroke="#ff6b2b"
+            stroke-width="1.6"
+            marker-end="url(#a)"
+          />
+          <text x="199" y="290" text-anchor="middle" font-size="10" fill="#c4471a">
+            "put it live"
+          </text>
+          <line
+            x1="305"
+            y1="262"
+            x2="305"
+            y2="212"
+            stroke="#8a8580"
+            stroke-width="1.6"
+            marker-end="url(#a)"
+          />
+          <text x="312" y="242" font-size="10" fill="#5f6368">builds</text>
+          <line
+            x1="470"
+            y1="212"
+            x2="500"
+            y2="260"
+            stroke="#3ecf8e"
+            stroke-width="1.6"
+            stroke-dasharray="5 4"
+            marker-end="url(#a)"
+          />
+        </svg>
+      </div>
+
+      <table>
+        <tr>
+          <th style="width: 23%">Service</th>
+          <th>What it does</th>
+        </tr>
+        <tr>
+          <td><b>GitHub</b></td>
+          <td>
+            Where the code lives. Think Dropbox for code, except it keeps every version you've ever
+            saved, so you can always go back.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Netlify</b></td>
+          <td>
+            Your web host. Every time GitHub changes, Netlify rebuilds the site and puts it live
+            (dreamy-taffy-27a291.netlify.app). It also runs the little "server function" that keeps
+            your Anthropic key out of sight.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Anthropic</b></td>
+          <td>
+            The company behind Claude. Every agent answer comes from them, charged per use to your
+            Anthropic account.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Supabase</b></td>
+          <td>
+            Your database. It's set up and ready to go, and will hold agent memory, chat history and
+            the activity log once there's a proper login.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Claude Code</b></td>
+          <td>
+            Claude as your developer, on your own computer. You tell it what you want; it makes the
+            change, checks it works, and saves it.
+          </td>
+        </tr>
+      </table>
+    </section>
+
+    <!-- ============================ WHAT I DID ============================ -->
+    <section class="page">
+      <h2><span class="num">3</span>What I've tidied up</h2>
+      <p class="lede">
+        All "under the bonnet" stuff. The app looks exactly the same, but it's safer, easier to
+        change, and ready for the fun bits.
+      </p>
+
+      <table>
+        <tr>
+          <th style="width: 32%">What</th>
+          <th>Why it matters</th>
+          <th style="width: 12%"></th>
+        </tr>
+        <tr>
+          <td><b>Passcode on the AI connection</b></td>
+          <td>
+            This is the big one. The AI connection was open to anyone who stumbled on it, and they
+            could've run up your Anthropic bill. Now it needs your passcode, and the agent
+            instructions and AI model are locked in on the server. You only type the passcode once
+            per device.
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+        <tr>
+          <td><b>All the agents in one spot</b></td>
+          <td>
+            Names, instructions, colours and quick tasks now live in one file
+            (<code>agents.js</code>). Adding or tweaking an agent is now a one-file job.
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+        <tr>
+          <td><b>Memory &amp; Activity Log fixed up</b></td>
+          <td>
+            These files had landed in a folder with a funny name, so they'd been switched off.
+            They're sorted now and ready to turn on once there's a login.
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+        <tr>
+          <td><b>Readable code</b></td>
+          <td>
+            The main screen was crammed into some very long lines, so it was hard to see what
+            changed. It's all neatly laid out now and stays tidy automatically.
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+        <tr>
+          <td><b>Keys out of the code</b></td>
+          <td>
+            Connection details now live in settings, not in the code, so they can't end up on GitHub
+            by accident.
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+        <tr>
+          <td><b>Cleared out the leftovers</b></td>
+          <td>
+            Binned the template files from the original setup and wrote a README that explains how
+            to run and change things.
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+        <tr>
+          <td><b>Claude Code with safety rails</b></td>
+          <td>
+            Set Claude up to talk to you in plain English, plus some automatic checks (more on the
+            next page).
+          </td>
+          <td><span class="pill p-done">Done</span></td>
+        </tr>
+      </table>
+
+      <h3>What's not there yet (totally normal at this stage!)</h3>
+      <div class="grid2">
+        <div class="card warm">
+          <h3>The agents can't search the web yet</h3>
+          <p>
+            Heads up on this one: if you ask HUNTER for "live tenders", it'll write convincing ones,
+            but they're <b>made up</b>. Until we add web search, treat research as ideas to check,
+            not gospel.
+          </p>
+        </div>
+        <div class="card warm">
+          <h3>They forget things</h3>
+          <p>
+            Chats disappear when you refresh, and the agents don't remember past chats or your
+            clients. Memory's the next big step.
+          </p>
+        </div>
+        <div class="card warm">
+          <h3>"24/7" is the goal, not yet the reality</h3>
+          <p>
+            Right now the agents only work while you're chatting to them. Morning reports, auto
+            follow-ups and tracking opens are on the list.
+          </p>
+        </div>
+        <div class="card warm">
+          <h3>Long answers get cut short</h3>
+          <p>
+            Answers are capped to fit the host's time limit. "Streaming" (words appearing as they're
+            written) fixes that and feels much snappier too.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ HOW TO WORK ============================ -->
+    <section class="page">
+      <h2><span class="num">4</span>How you can keep building it</h2>
+      <p class="lede">
+        You don't need to code at all. You tell Claude what you want, have a look, and decide if it
+        goes live. That's it.
+      </p>
+
+      <div class="grid2">
+        <div>
+          <h3>How it works</h3>
+          <ol class="steps">
+            <li>
+              <b>Just ask.</b> "Add an agent that writes quotes." "COMPOSER's emails are too long."
+            </li>
+            <li><b>Claude tells you the plan</b> in a few lines. You say yes (or tweak it).</li>
+            <li>
+              <b>Claude makes the change</b>, checks nothing's broken, and makes a
+              <b>save point</b>.
+            </li>
+            <li>
+              <b>You have a look</b> on your own computer first. Claude tells you what to click.
+            </li>
+            <li>
+              <b>"Put it live"</b> and it's on the website a couple of minutes later.<br /><b
+                >"Undo that"</b
+              >
+              and it's back how it was.
+            </li>
+          </ol>
+        </div>
+        <div>
+          <h3>Safety rails (always on)</h3>
+          <div class="card info" style="margin-bottom: 2.5mm">
+            <p>
+              🔑 <b>No keys in the code.</b> Claude physically can't write a secret key into a file.
+            </p>
+          </div>
+          <div class="card info" style="margin-bottom: 2.5mm">
+            <p>
+              ✅ <b>Can't finish with it broken.</b> Claude can't say "done" until the site builds
+              and the work's saved.
+            </p>
+          </div>
+          <div class="card info" style="margin-bottom: 2.5mm">
+            <p>🙋 <b>Nothing goes live without you.</b> Claude always checks with you first.</p>
+          </div>
+          <div class="card info">
+            <p>♻️ <b>Nothing gets lost.</b> Deleting work is blocked, and every version is kept.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>Who does what</h3>
+      <table>
+        <tr>
+          <th style="width: 50%">You, with Claude</th>
+          <th>Give me a shout</th>
+        </tr>
+        <tr>
+          <td>
+            New agents, tweaking how agents write, quick tasks, wording, colours, layout, and the
+            "small" ideas on the next page
+          </td>
+          <td>
+            Logins, the database, anything with money or emails going out, hooking up other systems
+            (CRM, Gmail), or any time Claude says "this is a bigger change"
+          </td>
+        </tr>
+      </table>
+      <p class="quote">
+        A few good habits: one change at a time · always have a look before "put it live" · never
+        paste a key into the chat · if in doubt, make a save point first.
+      </p>
+    </section>
+
+    <!-- ============================ IDEAS ============================ -->
+    <section class="page compact">
+      <h2><span class="num">5</span>Ideas to make it even better</h2>
+      <p class="lede">
+        A bunch of ideas, grouped up. <span class="pill p-s">Small</span> = an hour or two ·
+        <span class="pill p-m">Medium</span> = about a day · <span class="pill p-l">Large</span> = a
+        few days. <span class="star">★</span> = where I'd start.
+      </p>
+
+      <h3>What the agents can do</h3>
+      <table>
+        <tr>
+          <td style="width: 36%"><span class="star">★</span> <b>A Brandboy company brief</b></td>
+          <td>
+            One shared page every agent reads: your services, regions, typical jobs, past clients,
+            how you like to sound. Biggest bang for buck by far.
+          </td>
+          <td style="width: 13%"><span class="pill p-s">Small</span></td>
+        </tr>
+        <tr>
+          <td><span class="star">★</span> <b>Real web search</b></td>
+          <td>
+            SCOUT, HUNTER and RANKR find <i>real</i> tenders, companies and keywords, with links so
+            you can check.
+          </td>
+          <td><span class="pill p-m">Medium</span></td>
+        </tr>
+        <tr>
+          <td><b>Memory</b></td>
+          <td>Agents remember past chats and facts ("we already reached out to Westfield").</td>
+          <td><span class="pill p-m">Medium</span></td>
+        </tr>
+        <tr>
+          <td><b>Hand-offs</b></td>
+          <td>"Send SCOUT's list to COMPOSER" and boom, emails drafted for each prospect.</td>
+          <td><span class="pill p-m">Medium</span></td>
+        </tr>
+        <tr>
+          <td><b>Read your documents</b></td>
+          <td>Drop in a tender PDF or brief and ask an agent about it.</td>
+          <td><span class="pill p-m">Medium</span></td>
+        </tr>
+        <tr>
+          <td><b>Morning brief</b></td>
+          <td>
+            New tenders and follow-ups due, in your inbox every morning. This is what makes "24/7"
+            real.
+          </td>
+          <td><span class="pill p-l">Large</span></td>
+        </tr>
+        <tr>
+          <td><b>Gmail / CRM hook-up</b></td>
+          <td>Agents prep the emails and pipeline updates; you approve and hit send.</td>
+          <td><span class="pill p-l">Large</span></td>
+        </tr>
+      </table>
+
+      <h3>Everyday use</h3>
+      <table>
+        <tr>
+          <td style="width: 36%"><span class="star">★</span> <b>Chats stick around</b></td>
+          <td>They survive a refresh, plus a "New chat" button.</td>
+          <td style="width: 13%"><span class="pill p-s">Small</span></td>
+        </tr>
+        <tr>
+          <td><span class="star">★</span> <b>Copy button on replies</b></td>
+          <td>One click to grab an email or list and paste it anywhere.</td>
+          <td><span class="pill p-s">Small</span></td>
+        </tr>
+        <tr>
+          <td><span class="star">★</span> <b>Nicely formatted answers</b></td>
+          <td>Proper headings, bullets and tables instead of stray symbols.</td>
+          <td><span class="pill p-s">Small</span></td>
+        </tr>
+        <tr>
+          <td><b>Stop / retry buttons</b></td>
+          <td>Plus friendlier error messages.</td>
+          <td><span class="pill p-s">Small</span></td>
+        </tr>
+        <tr>
+          <td><b>Activity Log switched on</b></td>
+          <td>See what each agent's been up to (once there's a login).</td>
+          <td><span class="pill p-s">Small</span></td>
+        </tr>
+      </table>
+
+      <h3>Look and feel</h3>
+      <table>
+        <tr>
+          <td style="width: 36%"><b>Works great on your phone</b></td>
+          <td>Sidebar turns into a menu, so you can use it on site.</td>
+          <td style="width: 13%"><span class="pill p-m">Medium</span></td>
+        </tr>
+        <tr>
+          <td><span class="star">★</span> <b>Easier on the eyes</b></td>
+          <td>Slightly bigger text and a bit more contrast.</td>
+          <td><span class="pill p-s">Small</span></td>
+        </tr>
+        <tr>
+          <td><b>Strategy page as a tracker</b></td>
+          <td>Tick things off and watch the progress.</td>
+          <td><span class="pill p-m">Medium</span></td>
+        </tr>
+        <tr>
+          <td><b>Saved outputs panel</b></td>
+          <td>Keep your best lists and emails next to the chat to reuse.</td>
+          <td><span class="pill p-m">Medium</span></td>
+        </tr>
+      </table>
+
+      <div class="keep">
+        <h3>Behind the scenes</h3>
+        <table>
+          <tr>
+            <td style="width: 36%"><b>Proper login</b></td>
+            <td>
+              An email-link login just for you. Replaces the passcode and unlocks memory and
+              history.
+            </td>
+            <td style="width: 13%"><span class="pill p-m">Medium</span></td>
+          </tr>
+          <tr>
+            <td><b>Streaming answers</b></td>
+            <td>Words appear as they're written; no more cut-off answers.</td>
+            <td><span class="pill p-m">Medium</span></td>
+          </tr>
+          <tr>
+            <td><b>Automatic checks before going live</b></td>
+            <td>A broken change can never hit the website, plus preview links to try things.</td>
+            <td><span class="pill p-s">Small</span></td>
+          </tr>
+          <tr>
+            <td><b>Spending controls</b></td>
+            <td>A monthly cap on the Anthropic account, and cheaper repeat requests.</td>
+            <td><span class="pill p-s">Small</span></td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================ NEXT STEPS ============================ -->
+    <section class="page">
+      <h2><span class="num">6</span>Where to from here</h2>
+      <p class="lede">
+        No pressure on any of this. You pick the pace and how hands-on you want to be.
+      </p>
+
+      <div class="grid3" style="margin-bottom: 6mm">
+        <div class="card good">
+          <h3>Now</h3>
+          <p>
+            Get the security fix and Claude setup live. We set up Claude Code on your Mac together,
+            and you make your first change (a new agent is a fun one to start with).
+          </p>
+        </div>
+        <div class="card info">
+          <h3>Next couple of weeks</h3>
+          <p>
+            You and Claude: the company brief, copy buttons, chats that stick around, formatted
+            answers, easier-to-read text.
+          </p>
+        </div>
+        <div class="card warm">
+          <h3>After that</h3>
+          <p>
+            I'll do login + memory, streaming answers and web search. Then hand-offs, documents, the
+            morning brief and the phone layout.
+          </p>
+        </div>
+      </div>
+
+      <h3>Stuff to chat about on Wednesday</h3>
+      <ol class="steps">
+        <li>Which agents do you actually use the most? Any answers that have let you down?</li>
+        <li>Is the website link shared with anyone else, or is it just you?</li>
+        <li>Where do your prospects and contacts live now: a spreadsheet, a CRM, your inbox?</li>
+        <li>
+          Do you want to have a crack at changes yourself, or would you rather I make them and you
+          check them? Honestly, either is totally fine, and I'm happy to do any of it.
+        </li>
+        <li>What sort of monthly AI spend feels comfortable?</li>
+      </ol>
+
+      <h3>Bits I'll sort before then</h3>
+      <table>
+        <tr>
+          <td>Add your passcode to the Netlify settings before the update goes live</td>
+        </tr>
+        <tr>
+          <td>Set a monthly spend cap on the Anthropic account and check recent usage</td>
+        </tr>
+        <tr>
+          <td>Double-check the database security settings in Supabase</td>
+        </tr>
+      </table>
+
+      <p class="footer-note">
+        Any questions, just give me a bell. Looking forward to Wednesday! Eric
+      </p>
+    </section>
+  </body>
+</html>
