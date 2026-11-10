@@ -11,11 +11,15 @@
 //
 // systemPrompt = the private instructions Claude gets for that agent. They are
 // only used on the server, so website visitors can't change them.
+//
+// webSearch: true = the agent can search the web (up to 3 searches per answer)
+// and lists its sources. Each search costs about 1 cent plus reading time.
 // =============================================================================
 
 export const AGENTS = [
   {
     id: "scout",
+    webSearch: true, // can search the web for real, current information
     name: "SCOUT",
     title: "Lead Intelligence Agent",
     emoji: "🔍",
@@ -56,6 +60,7 @@ export const AGENTS = [
   },
   {
     id: "hunter",
+    webSearch: true, // can search the web for real, current information
     name: "HUNTER",
     title: "Project Opportunity Agent",
     emoji: "🎯",
@@ -96,6 +101,7 @@ export const AGENTS = [
   },
   {
     id: "seo",
+    webSearch: true, // can search the web for real, current information
     name: "RANKR",
     title: "SEO & Digital Visibility Agent",
     emoji: "📈",

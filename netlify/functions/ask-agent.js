@@ -83,39 +83,51 @@ export default async (req) => {
   }
 
   const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-  const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      // Sonnet 5.5 "thinks" before answering by default, and that thinking uses
-      // up the token limit above, which could leave the answer empty. These are
-      // quick chat answers, so thinking is turned off: faster and never blank.
-      // (This setting only exists on Sonnet 5.5; other models skip it.)
-      ...(model === "claude-sonnet-5-5" && { thinking: { type: "between_tools" } }),
-      system: agent.systemPrompt,
-      messages,
-    }),
-  });
+  const request = {
+    model,
+    max_tokens: MAX_OUTPUT_TOKENS,
+    // Sonnet 5.5 "thinks" before answering by default, and that thinking uses
+    // up the token limit above, which could leave the answer empty. These are
+    // quick chat answers, so thinking is turned off: faster and never blank.
+    // (This setting only exists on Sonnet 5.5; other models skip it.)
+    ...(model === "claude-sonnet-5-5" && { thinking: { type: "between_tools" } }),
+    system: agent.webSearch ? `${agent.systemPrompt}\n\n${webSearchRules()}` : agent.systemPrompt,
+    ...(agent.webSearch && { tools: [WEB_SEARCH_TOOL] }),
+    messages,
+  };
 
-  const data = await anthropicRes.json();
-  if (!anthropicRes.ok) {
-    console.error("Anthropic error", anthropicRes.status, data);
-    return reply(502, {
-      error: data?.error?.message || "Claude returned an error",
+  // A web search can make Claude "pause" part-way; we let it carry on, but only
+  // while there's time left before Netlify's time limit.
+  const startedAt = Date.now();
+  const content = [];
+  let data;
+  for (;;) {
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify(request),
     });
+    data = await anthropicRes.json();
+    if (!anthropicRes.ok) {
+      console.error("Anthropic error", anthropicRes.status, data);
+      return reply(502, {
+        error: data?.error?.message || "Claude returned an error",
+      });
+    }
+    content.push(...(data.content || []));
+    if (data.stop_reason !== "pause_turn" || Date.now() - startedAt > CONTINUE_WITHIN_MS) break;
+    request.messages = [...messages, { role: "assistant", content }];
   }
 
   if (data.stop_reason === "refusal") {
     return reply(502, { error: "The agent declined that request. Try rephrasing it." });
   }
-  let text = (data.content || [])
-    .filter((block) => block.type === "text")
+  const textBlocks = content.filter((block) => block.type === "text");
+  let text = textBlocks
     .map((block) => block.text)
     .join("")
     .trim();
@@ -125,11 +137,56 @@ export default async (req) => {
       error: "The agent didn't manage an answer that time. Press Send to retry.",
     });
   }
-  if (data.stop_reason === "max_tokens") {
+  if (data.stop_reason === "max_tokens" || data.stop_reason === "pause_turn") {
     text += "\n\n_(Answer cut short. Ask me to continue.)_";
   }
+  text += sourcesList(textBlocks);
   return reply(200, { text });
 };
+
+// ---- Web search ----------------------------------------------------------------
+// Only agents with `webSearch: true` in src/agents.js get this. Searches are
+// capped so one answer can't take too long or cost too much.
+const WEB_SEARCH_TOOL = {
+  type: "web_search_20260209",
+  name: "web_search",
+  max_uses: 3,
+  user_location: {
+    type: "approximate",
+    city: "Sydney",
+    region: "New South Wales",
+    country: "AU",
+    timezone: "Australia/Sydney",
+  },
+};
+const CONTINUE_WITHIN_MS = 15000;
+
+function webSearchRules() {
+  const today = new Date().toLocaleDateString("en-AU", {
+    dateStyle: "long",
+    timeZone: "Australia/Sydney",
+  });
+  return [
+    `Today is ${today}.`,
+    "You can search the web. Use it for anything current or specific: tenders, DAs, companies, people, prices, rankings.",
+    "Use at most 3 searches, and keep the answer short enough to read on one screen.",
+    "Never invent tenders, companies, names, phone numbers or emails. If you can't find something, say so plainly.",
+  ].join(" ");
+}
+
+// Turns the web pages Claude quoted into a "Sources" list of links, so Lars can
+// check where each fact came from.
+function sourcesList(textBlocks) {
+  const seen = new Map();
+  for (const block of textBlocks) {
+    for (const c of block.citations || []) {
+      if (c.url && !seen.has(c.url)) seen.set(c.url, (c.title || c.url).replace(/[[\]]/g, ""));
+    }
+  }
+  if (!seen.size) return "";
+  const links = [...seen].slice(0, 8).map(([url, title]) => `- [${title}](${url})`);
+  return `\n\n**Sources**\n${links.join("\n")}`;
+}
 
 export const config = {
   path: "/api/ask-agent",
