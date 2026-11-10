@@ -56,7 +56,10 @@ async function askAgent(agent, messages, isRetry = false) {
         ? "That passcode didn't work. Paste the Mission Control passcode again:"
         : "Enter the Mission Control passcode",
     );
-  if (!code) throw new Error("No passcode entered. Send the message again to try.");
+  if (!code)
+    throw new Error(
+      "No passcode entered. Your message is back in the box: press Send to try again.",
+    );
   const res = await fetch("/api/ask-agent", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-app-passcode": code },
@@ -65,7 +68,7 @@ async function askAgent(agent, messages, isRetry = false) {
   if (res.status === 401) {
     savePasscode("");
     if (!isRetry) return askAgent(agent, messages, true);
-    throw new Error("Wrong passcode. Send the message again to try another one.");
+    throw new Error("Wrong passcode. Your message is back in the box: press Send to try again.");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -313,7 +316,10 @@ export default function MissionControl() {
       ],
     }));
     try {
-      const apiMsgs = newMsgs.map((m) => ({ role: m.role, content: m.content }));
+      // Error notes are only for Lars to see; they are never sent to the AI.
+      const apiMsgs = newMsgs
+        .filter((m) => !m.error)
+        .map((m) => ({ role: m.role, content: m.content }));
       const reply = await askAgent(activeAgent, apiMsgs);
       await saveMemory(activeAgent.name, "task", `User: ${text}\n\n${activeAgent.name}: ${reply}`, [
         activeAgent.focus,
@@ -336,15 +342,19 @@ export default function MissionControl() {
         };
       });
     } catch (err) {
+      // The message didn't go through: take it out of the chat and put it back
+      // in the text box, so pressing Send tries again without retyping.
+      setInput(text);
       setConversations((c) => {
-        const cur = c[activeAgent.id].filter((m) => !m.pending);
+        const cur = c[activeAgent.id].filter((m) => !m.pending && m !== userMsg);
         return {
           ...c,
           [activeAgent.id]: [
             ...cur,
             {
               role: "assistant",
-              content: `⚠️ Error: ${err.message}`,
+              error: true,
+              content: `⚠️ ${err.message}`,
               agentName: activeAgent.name,
               agentColor: activeAgent.color,
               agentEmoji: activeAgent.emoji,
