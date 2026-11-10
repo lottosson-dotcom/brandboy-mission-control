@@ -82,6 +82,7 @@ export default async (req) => {
     });
   }
 
+  const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -90,8 +91,13 @@ export default async (req) => {
       "x-api-key": apiKey,
     },
     body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      model,
       max_tokens: MAX_OUTPUT_TOKENS,
+      // Sonnet 5.5 "thinks" before answering by default, and that thinking uses
+      // up the token limit above, which could leave the answer empty. These are
+      // quick chat answers, so thinking is turned off: faster and never blank.
+      // (This setting only exists on Sonnet 5.5; other models skip it.)
+      ...(model === "claude-sonnet-5-5" && { thinking: { type: "between_tools" } }),
       system: agent.systemPrompt,
       messages,
     }),
@@ -105,7 +111,23 @@ export default async (req) => {
     });
   }
 
-  const text = (data.content || []).map((block) => block.text || "").join("");
+  if (data.stop_reason === "refusal") {
+    return reply(502, { error: "The agent declined that request. Try rephrasing it." });
+  }
+  let text = (data.content || [])
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("")
+    .trim();
+  if (!text) {
+    console.error("Empty answer", data.stop_reason, data.usage);
+    return reply(502, {
+      error: "The agent didn't manage an answer that time. Press Send to retry.",
+    });
+  }
+  if (data.stop_reason === "max_tokens") {
+    text += "\n\n_(Answer cut short. Ask me to continue.)_";
+  }
   return reply(200, { text });
 };
 
