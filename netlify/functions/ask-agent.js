@@ -20,9 +20,9 @@
 import { AGENTS } from "../../src/agents.js";
 
 const DEFAULT_MODEL = "claude-sonnet-5-5";
-// Kept at 1000: longer answers can exceed Netlify's ~10s function time limit.
-// Streaming the reply (docs/PLAN.md, A3) removes this limit.
-const MAX_OUTPUT_TOKENS = 1000;
+// Answers are streamed, and Netlify allows 60 seconds per answer, so there's
+// room for long answers (about 2,000 words).
+const MAX_OUTPUT_TOKENS = 3000;
 const MAX_MESSAGES = 40;
 const MAX_TOTAL_CHARACTERS = 60000;
 // PDFs: Netlify accepts requests up to about 6 MB, and a PDF grows by a third
@@ -115,35 +115,126 @@ export default async (req) => {
   };
   const originalMessages = request.messages;
 
-  // A web search can make Claude "pause" part-way; we let it carry on, but only
-  // while there's time left before Netlify's time limit.
-  const startedAt = Date.now();
-  const content = [];
-  let data;
-  for (;;) {
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "x-api-key": apiKey,
-      },
-      body: JSON.stringify(request),
-    });
-    data = await anthropicRes.json();
-    if (!anthropicRes.ok) {
-      console.error("Anthropic error", anthropicRes.status, data);
-      return reply(502, {
-        error: data?.error?.message || "Claude returned an error",
-      });
-    }
-    content.push(...(data.content || []));
-    if (data.stop_reason !== "pause_turn" || Date.now() - startedAt > CONTINUE_WITHIN_MS) break;
-    request.messages = [...originalMessages, { role: "assistant", content }];
+  // The first call to Claude happens before we start answering, so problems
+  // like a bad key still come back as a normal error message.
+  const first = await callClaude(apiKey, request);
+  if (!first.ok) {
+    const data = await first.json().catch(() => ({}));
+    console.error("Anthropic error", first.status, data);
+    return reply(502, { error: data?.error?.message || "Claude returned an error" });
   }
 
-  if (data.stop_reason === "refusal") {
-    return reply(502, { error: "The agent declined that request. Try rephrasing it." });
+  // From here the answer is STREAMED: the website receives one line per event
+  //   {"type":"text","text":"..."}   more words of the answer
+  //   {"type":"searching"}           a web search started (hide the words so far)
+  //   {"type":"done","text":"..."}   the final, complete answer (with sources)
+  //   {"type":"error","error":"..."} something went wrong part-way
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      try {
+        const startedAt = Date.now();
+        const content = [];
+        let res = first;
+        let stopReason;
+        for (;;) {
+          const turn = await readClaudeStream(res, {
+            onText: (text) => send({ type: "text", text }),
+            onSearch: () => send({ type: "searching" }),
+          });
+          content.push(...turn.blocks);
+          stopReason = turn.stopReason;
+          // A web search can make Claude "pause" part-way; let it carry on
+          // while there's time left before Netlify's 60-second limit.
+          if (stopReason !== "pause_turn" || Date.now() - startedAt > CONTINUE_WITHIN_MS) break;
+          request.messages = [...originalMessages, { role: "assistant", content }];
+          res = await callClaude(apiKey, request);
+          if (!res.ok) throw new Error(`Claude returned ${res.status} on continue`);
+        }
+        send(finalAnswer(content, stopReason));
+      } catch (err) {
+        console.error("Streaming failed:", err);
+        send({ type: "error", error: "Something went wrong part-way. Press Send to retry." });
+      }
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" },
+  });
+};
+
+function callClaude(apiKey, request) {
+  return fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "anthropic-version": "2023-06-01",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify({ ...request, stream: true }),
+  });
+}
+
+// Reads Claude's live answer (server-sent events) and rebuilds the full reply
+// from it, while passing each new piece of text on as it arrives.
+async function readClaudeStream(res, { onText, onSearch }) {
+  const blocks = [];
+  const toolInput = {};
+  let stopReason = null;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf("\n\n")) !== -1) {
+      const chunk = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const line = chunk.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      const event = JSON.parse(line.slice(5));
+      if (event.type === "content_block_start") {
+        const block = structuredClone(event.content_block);
+        if (block.type === "text") block.text ||= "";
+        blocks[event.index] = block;
+        if (block.type === "server_tool_use") onSearch();
+      } else if (event.type === "content_block_delta") {
+        const block = blocks[event.index];
+        const d = event.delta;
+        if (d.type === "text_delta") {
+          block.text += d.text;
+          onText(d.text);
+        } else if (d.type === "input_json_delta") {
+          toolInput[event.index] = (toolInput[event.index] || "") + d.partial_json;
+        } else if (d.type === "citations_delta") {
+          (block.citations ||= []).push(d.citation);
+        } else if (d.type === "thinking_delta") {
+          block.thinking = (block.thinking || "") + d.thinking;
+        } else if (d.type === "signature_delta") {
+          block.signature = d.signature;
+        }
+      } else if (event.type === "content_block_stop") {
+        if (toolInput[event.index] !== undefined) {
+          blocks[event.index].input = JSON.parse(toolInput[event.index] || "{}");
+        }
+      } else if (event.type === "message_delta") {
+        stopReason = event.delta?.stop_reason ?? stopReason;
+      } else if (event.type === "error") {
+        throw new Error(event.error?.message || "Claude stream error");
+      }
+    }
+  }
+  return { blocks: blocks.filter(Boolean), stopReason };
+}
+
+// Works out the final answer to show, or a friendly error.
+function finalAnswer(content, stopReason) {
+  if (stopReason === "refusal") {
+    return { type: "error", error: "The agent declined that request. Try rephrasing it." };
   }
   for (const block of content) {
     if (block.type === "web_search_tool_result" && block.content?.error_code) {
@@ -161,17 +252,17 @@ export default async (req) => {
     .join("")
     .trim();
   if (!text) {
-    console.error("Empty answer", data.stop_reason, data.usage);
-    return reply(502, {
+    console.error("Empty answer", stopReason);
+    return {
+      type: "error",
       error: "The agent didn't manage an answer that time. Press Send to retry.",
-    });
+    };
   }
-  if (data.stop_reason === "max_tokens" || data.stop_reason === "pause_turn") {
+  if (stopReason === "max_tokens" || stopReason === "pause_turn") {
     text += "\n\n_(Answer cut short. Ask me to continue.)_";
   }
-  text += sourcesList(textBlocks);
-  return reply(200, { text });
-};
+  return { type: "done", text: text + sourcesList(textBlocks) };
+}
 
 // ---- PDFs ----------------------------------------------------------------------
 // A message with a PDF becomes "here's a document" + the question. The PDF is
@@ -209,7 +300,7 @@ const WEB_SEARCH_TOOL = {
     timezone: "Australia/Sydney",
   },
 };
-const CONTINUE_WITHIN_MS = 15000;
+const CONTINUE_WITHIN_MS = 35000;
 
 function webSearchRules() {
   const today = new Date().toLocaleDateString("en-AU", {

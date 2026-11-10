@@ -52,7 +52,9 @@ function askForPasscode(message) {
   savePasscode(typed);
   return typed;
 }
-async function askAgent(agent, messages, isRetry = false) {
+// onProgress(textSoFar) is called while the answer streams in, so the chat can
+// show the words as they're written. Returns the final, complete answer.
+async function askAgent(agent, messages, onProgress, isRetry = false) {
   const code =
     (!isRetry && readSavedPasscode()) ||
     askForPasscode(
@@ -71,12 +73,41 @@ async function askAgent(agent, messages, isRetry = false) {
   });
   if (res.status === 401) {
     savePasscode("");
-    if (!isRetry) return askAgent(agent, messages, true);
+    if (!isRetry) return askAgent(agent, messages, onProgress, true);
     throw new Error("Wrong passcode. Your message is back in the box: press Send to try again.");
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-  return data.text;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  // The answer arrives as one JSON line per event (see ask-agent.js).
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let soFar = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line);
+      if (event.type === "text") {
+        soFar += event.text;
+        onProgress(soFar);
+      } else if (event.type === "searching") {
+        soFar = "";
+        onProgress("🔎 _Searching the web…_");
+      } else if (event.type === "done") {
+        return event.text;
+      } else if (event.type === "error") {
+        throw new Error(event.error);
+      }
+    }
+  }
+  throw new Error("The answer stopped part-way. Press Send to retry.");
 }
 // ---- Saved chats ----------------------------------------------------------
 // Chats are kept in this browser only (not on a server), so they survive a
@@ -422,7 +453,15 @@ export default function MissionControl() {
     try {
       // Error notes are only for Lars to see; they are never sent to the AI.
       const apiMsgs = toServerMessages(recentHistory(newMsgs.filter((m) => !m.error)));
-      const reply = await askAgent(activeAgent, apiMsgs);
+      // Fill in the reply bubble as the words arrive.
+      const showProgress = (partial) =>
+        setConversations((c) => ({
+          ...c,
+          [activeAgent.id]: c[activeAgent.id].map((m) =>
+            m.pending ? { ...m, content: partial } : m,
+          ),
+        }));
+      const reply = await askAgent(activeAgent, apiMsgs, showProgress);
       await saveMemory(activeAgent.name, "task", `User: ${text}\n\n${activeAgent.name}: ${reply}`, [
         activeAgent.focus,
         activeAgent.id,
