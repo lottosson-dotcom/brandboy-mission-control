@@ -126,7 +126,17 @@ export default async (req) => {
   if (data.stop_reason === "refusal") {
     return reply(502, { error: "The agent declined that request. Try rephrasing it." });
   }
-  const textBlocks = content.filter((block) => block.type === "text");
+  for (const block of content) {
+    if (block.type === "web_search_tool_result" && block.content?.error_code) {
+      console.error("Web search failed:", block.content.error_code);
+    }
+  }
+  // Only keep the text written after the last search: the final answer, not
+  // the "I'll search for…" notes in between.
+  const lastSearch = content.findLastIndex(
+    (block) => block.type === "server_tool_use" || block.type === "web_search_tool_result",
+  );
+  const textBlocks = content.slice(lastSearch + 1).filter((block) => block.type === "text");
   let text = textBlocks
     .map((block) => block.text)
     .join("")
@@ -148,7 +158,9 @@ export default async (req) => {
 // Only agents with `webSearch: true` in src/agents.js get this. Searches are
 // capped so one answer can't take too long or cost too much.
 const WEB_SEARCH_TOOL = {
-  type: "web_search_20260209",
+  // The basic version: searches directly. (The newer "dynamic filtering"
+  // version runs extra code per search, which was slower and less reliable.)
+  type: "web_search_20250305",
   name: "web_search",
   max_uses: 3,
   user_location: {
