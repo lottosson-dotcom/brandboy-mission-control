@@ -46,7 +46,8 @@ export default async (req) => {
     });
   }
 
-  if (req.headers.get("x-app-passcode") !== passcode) {
+  // Trim both sides so a stray space from copy-paste doesn't lock Lars out.
+  if ((req.headers.get("x-app-passcode") || "").trim() !== passcode.trim()) {
     return reply(401, { error: "Wrong or missing passcode" });
   }
 

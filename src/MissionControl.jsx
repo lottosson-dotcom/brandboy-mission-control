@@ -26,29 +26,49 @@ const C = {
   faint: "#333",
 };
 import { AGENTS, QUICK_TASKS } from "./agents.js";
+// The passcode is asked for once and remembered in this browser.
+// Cancel = nothing is saved and nothing is sent. A wrong passcode is forgotten
+// straight away so the next message asks again.
 const PASSCODE_KEY = "mc-passcode";
-function getPasscode(forceAsk) {
-  let code = null;
+function readSavedPasscode() {
   try {
-    code = localStorage.getItem(PASSCODE_KEY);
-  } catch {}
-  if (!code || forceAsk) {
-    code = window.prompt("Enter the Mission Control passcode") || "";
-    try {
-      localStorage.setItem(PASSCODE_KEY, code);
-    } catch {}
+    return localStorage.getItem(PASSCODE_KEY) || "";
+  } catch {
+    return "";
   }
-  return code;
+}
+function savePasscode(code) {
+  try {
+    if (code) localStorage.setItem(PASSCODE_KEY, code);
+    else localStorage.removeItem(PASSCODE_KEY);
+  } catch {}
+}
+function askForPasscode(message) {
+  const typed = (window.prompt(message) || "").trim();
+  savePasscode(typed);
+  return typed;
 }
 async function askAgent(agent, messages, isRetry = false) {
+  const code =
+    (!isRetry && readSavedPasscode()) ||
+    askForPasscode(
+      isRetry
+        ? "That passcode didn't work. Paste the Mission Control passcode again:"
+        : "Enter the Mission Control passcode",
+    );
+  if (!code) throw new Error("No passcode entered. Send the message again to try.");
   const res = await fetch("/api/ask-agent", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-app-passcode": getPasscode(isRetry) },
+    headers: { "Content-Type": "application/json", "x-app-passcode": code },
     body: JSON.stringify({ agentId: agent.id, messages }),
   });
-  if (res.status === 401 && !isRetry) return askAgent(agent, messages, true);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (res.status === 401) {
+    savePasscode("");
+    if (!isRetry) return askAgent(agent, messages, true);
+    throw new Error("Wrong passcode. Send the message again to try another one.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data.text;
 }
 function StatusPill({ status, color }) {
