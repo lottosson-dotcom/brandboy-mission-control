@@ -25,6 +25,10 @@ const DEFAULT_MODEL = "claude-sonnet-5-5";
 const MAX_OUTPUT_TOKENS = 1000;
 const MAX_MESSAGES = 40;
 const MAX_TOTAL_CHARACTERS = 60000;
+// PDFs: Netlify accepts requests up to about 6 MB, and a PDF grows by a third
+// when sent from the browser, so the website keeps each PDF under 4 MB.
+const MAX_PDFS = 2;
+const MAX_PDF_CHARACTERS = 5_600_000;
 
 function reply(status, body) {
   return new Response(JSON.stringify(body), {
@@ -69,10 +73,24 @@ export default async (req) => {
     messages.length > 0 &&
     messages.length <= MAX_MESSAGES &&
     messages.every(
-      (m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
+      (m) =>
+        (m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string" &&
+        (m.pdf === undefined ||
+          (m.role === "user" &&
+            typeof m.pdf?.name === "string" &&
+            typeof m.pdf?.data === "string")),
     );
   if (!messagesAreValid) {
     return reply(400, { error: "messages must be a list of chat turns" });
+  }
+
+  const pdfs = messages.filter((m) => m.pdf).map((m) => m.pdf);
+  const pdfCharacters = pdfs.reduce((n, p) => n + p.data.length, 0);
+  if (pdfs.length > MAX_PDFS || pdfCharacters > MAX_PDF_CHARACTERS) {
+    return reply(400, {
+      error: "Too many or too large PDFs in this chat. Start a new chat with just one.",
+    });
   }
 
   const totalCharacters = messages.reduce((n, m) => n + m.content.length, 0);
@@ -93,8 +111,9 @@ export default async (req) => {
     ...(model === "claude-sonnet-5-5" && { thinking: { type: "between_tools" } }),
     system: agent.webSearch ? `${agent.systemPrompt}\n\n${webSearchRules()}` : agent.systemPrompt,
     ...(agent.webSearch && { tools: [WEB_SEARCH_TOOL] }),
-    messages,
+    messages: messages.map(toClaudeMessage),
   };
+  const originalMessages = request.messages;
 
   // A web search can make Claude "pause" part-way; we let it carry on, but only
   // while there's time left before Netlify's time limit.
@@ -120,7 +139,7 @@ export default async (req) => {
     }
     content.push(...(data.content || []));
     if (data.stop_reason !== "pause_turn" || Date.now() - startedAt > CONTINUE_WITHIN_MS) break;
-    request.messages = [...messages, { role: "assistant", content }];
+    request.messages = [...originalMessages, { role: "assistant", content }];
   }
 
   if (data.stop_reason === "refusal") {
@@ -153,6 +172,25 @@ export default async (req) => {
   text += sourcesList(textBlocks);
   return reply(200, { text });
 };
+
+// ---- PDFs ----------------------------------------------------------------------
+// A message with a PDF becomes "here's a document" + the question. The PDF is
+// marked for caching, so follow-up questions about it cost about a tenth.
+function toClaudeMessage(m) {
+  if (!m.pdf) return { role: m.role, content: m.content };
+  return {
+    role: "user",
+    content: [
+      {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: m.pdf.data },
+        title: m.pdf.name.slice(0, 200),
+        cache_control: { type: "ephemeral" },
+      },
+      { type: "text", text: m.content || "Please read this document." },
+    ],
+  };
+}
 
 // ---- Web search ----------------------------------------------------------------
 // Only agents with `webSearch: true` in src/agents.js get this. Searches are

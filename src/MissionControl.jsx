@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { PdfChip } from "./components/PdfAttach.jsx";
+import { readPdf } from "./lib/pdf.js";
 // Memory and Activity Log are switched off until login is added (docs/PLAN.md, phase 2).
 const saveMemory = async () => {};
 const ActivityLog = () => (
@@ -93,7 +95,13 @@ function loadChats() {
 function saveChats(conversations) {
   try {
     const clean = Object.fromEntries(
-      Object.entries(conversations).map(([id, list]) => [id, list.filter((m) => !m.pending)]),
+      Object.entries(conversations).map(([id, list]) => [
+        id,
+        list
+          .filter((m) => !m.pending)
+          // PDFs are too big to keep in the browser: save only the file name.
+          .map((m) => (m.pdf ? { ...m, pdf: { name: m.pdf.name, size: m.pdf.size } } : m)),
+      ]),
     );
     localStorage.setItem(CHATS_KEY, JSON.stringify(clean));
   } catch {}
@@ -108,6 +116,21 @@ function recentHistory(messages) {
   while (recent.length > 1 && size(recent) > HISTORY_CHARACTERS) recent = recent.slice(1);
   while (recent.length > 1 && recent[0].role !== "user") recent = recent.slice(1);
   return recent;
+}
+// Turns chat messages into what the server expects. Only the 2 most recent PDFs
+// are sent along; older ones (or ones lost on a refresh) become a short note.
+function toServerMessages(messages) {
+  const withData = messages.filter((m) => m.pdf?.data);
+  const keep = new Set(withData.slice(-2));
+  return messages.map((m) => {
+    const out = { role: m.role, content: m.content };
+    if (!m.pdf) return out;
+    if (keep.has(m)) return { ...out, pdf: { name: m.pdf.name, data: m.pdf.data } };
+    return {
+      ...out,
+      content: `[Lars attached "${m.pdf.name}" earlier, but it is no longer available. If you need it, ask him to attach it again.]\n\n${m.content}`,
+    };
+  });
 }
 function StatusPill({ status, color }) {
   return (
@@ -243,7 +266,14 @@ function ChatBubble({ msg }) {
           </div>
         )}
         {isUser ? (
-          msg.content
+          <>
+            {msg.pdf && (
+              <div style={{ marginBottom: msg.content ? 6 : 0 }}>
+                <PdfChip pdf={msg.pdf} />
+              </div>
+            )}
+            {msg.content}
+          </>
         ) : (
           // Agents answer in Markdown (headings, bullets, tables). This turns it
           // into proper formatting instead of showing stray # and * symbols.
@@ -330,6 +360,10 @@ export default function MissionControl() {
   const [activeAgent, setActiveAgent] = useState(AGENTS[0]);
   const [conversations, setConversations] = useState(loadChats);
   const [input, setInput] = useState("");
+  const [pdf, setPdf] = useState(null); // PDF waiting to be sent with the next message
+  const [pdfProblem, setPdfProblem] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState("chat");
   const [time, setTime] = useState(new Date());
@@ -351,12 +385,25 @@ export default function MissionControl() {
     if (msgs.length && !window.confirm(`Start a new chat with ${activeAgent.name}?`)) return;
     setConversations((c) => ({ ...c, [activeAgent.id]: [] }));
   }
+  async function attachPdf(file) {
+    const { pdf: read, problem } = await readPdf(file);
+    setPdfProblem(problem || "");
+    if (read) setPdf(read);
+  }
   async function send(text) {
-    if (!text.trim() || loading) return;
-    const userMsg = { role: "user", content: text };
+    if ((!text.trim() && !pdf) || loading) return;
+    const userMsg = {
+      role: "user",
+      content: text.trim()
+        ? text
+        : "Summarise this document and point out anything important for Brandboy.",
+      ...(pdf && { pdf }),
+    };
     const newMsgs = [...msgs, userMsg];
     setConversations((c) => ({ ...c, [activeAgent.id]: newMsgs }));
     setInput("");
+    setPdf(null);
+    setPdfProblem("");
     setLoading(true);
     setConversations((c) => ({
       ...c,
@@ -374,9 +421,7 @@ export default function MissionControl() {
     }));
     try {
       // Error notes are only for Lars to see; they are never sent to the AI.
-      const apiMsgs = recentHistory(
-        newMsgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content })),
-      );
+      const apiMsgs = toServerMessages(recentHistory(newMsgs.filter((m) => !m.error)));
       const reply = await askAgent(activeAgent, apiMsgs);
       await saveMemory(activeAgent.name, "task", `User: ${text}\n\n${activeAgent.name}: ${reply}`, [
         activeAgent.focus,
@@ -402,6 +447,7 @@ export default function MissionControl() {
       // The message didn't go through: take it out of the chat and put it back
       // in the text box, so pressing Send tries again without retyping.
       setInput(text);
+      if (userMsg.pdf) setPdf(userMsg.pdf);
       setConversations((c) => {
         const cur = c[activeAgent.id].filter((m) => !m.pending && m !== userMsg);
         return {
@@ -604,7 +650,51 @@ export default function MissionControl() {
             </div>
           </div>
         </div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            position: "relative",
+          }}
+          // Drag a PDF anywhere onto the chat to attach it.
+          onDragOver={(e) => {
+            if (view !== "chat" || !e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false);
+          }}
+          onDrop={(e) => {
+            if (view !== "chat") return;
+            e.preventDefault();
+            setDragging(false);
+            attachPdf(e.dataTransfer.files[0]);
+          }}
+        >
+          {dragging && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 12,
+                zIndex: 5,
+                border: `2px dashed ${C.accent}`,
+                borderRadius: 12,
+                background: "#0A0A0ADD",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 16,
+                fontWeight: 700,
+                color: C.accent,
+                pointerEvents: "none",
+              }}
+            >
+              📄 Drop the PDF to attach it for {activeAgent.name}
+            </div>
+          )}
           {view === "chat" && (
             <>
               <div
@@ -723,16 +813,60 @@ export default function MissionControl() {
                   ))}
                 </div>
               )}
+              {(pdf || pdfProblem) && (
+                <div
+                  style={{
+                    background: "#1A1A1A",
+                    borderTop: "1px solid #2A2A2A",
+                    padding: "8px 20px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexShrink: 0,
+                    fontSize: 12,
+                  }}
+                >
+                  {pdf && <PdfChip pdf={pdf} onRemove={() => setPdf(null)} />}
+                  {pdfProblem && <span style={{ color: C.red }}>⚠️ {pdfProblem}</span>}
+                </div>
+              )}
               <div
                 style={{
                   background: "#1A1A1A",
-                  borderTop: "1px solid #2A2A2A",
+                  borderTop: pdf || pdfProblem ? "none" : "1px solid #2A2A2A",
                   padding: "12px 20px",
                   display: "flex",
                   gap: 10,
                   flexShrink: 0,
                 }}
               >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    attachPdf(e.target.files[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loading}
+                  title="Attach a PDF (or drag one onto the chat)"
+                  style={{
+                    background: "#141414",
+                    border: "1px solid #2A2A2A",
+                    borderRadius: 10,
+                    color: C.text,
+                    fontSize: 18,
+                    width: 44,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  📎
+                </button>
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -742,7 +876,11 @@ export default function MissionControl() {
                       send(input);
                     }
                   }}
-                  placeholder={`Give ${activeAgent.name} a task…`}
+                  placeholder={
+                    pdf
+                      ? `Ask ${activeAgent.name} about this PDF (or just press Send for a summary)…`
+                      : `Give ${activeAgent.name} a task… (📎 or drag in a PDF)`
+                  }
                   style={{
                     flex: 1,
                     background: "#141414",
@@ -761,7 +899,7 @@ export default function MissionControl() {
                 />
                 <button
                   onClick={() => send(input)}
-                  disabled={loading || !input.trim()}
+                  disabled={loading || (!input.trim() && !pdf)}
                   style={{
                     background: loading ? "#333" : "linear-gradient(135deg,#FF6B2B,#FF9A5C)",
                     border: "none",
