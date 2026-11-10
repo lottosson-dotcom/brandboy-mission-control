@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 // Memory and Activity Log are switched off until login is added (docs/PLAN.md, phase 2).
 const saveMemory = async () => {};
 const ActivityLog = () => (
-  <div style={{ padding: "24px", color: "#888", fontSize: "14px" }}>
+  <div style={{ padding: "24px", color: C.muted, fontSize: "14px" }}>
     📡 Activity Log — coming soon.
   </div>
 );
@@ -22,7 +24,7 @@ const C = {
   teal: "#14B8A6",
   cyan: "#06B6D4",
   text: "#F0F0F0",
-  muted: "#888",
+  muted: "#A3A3A3",
   faint: "#333",
 };
 import { AGENTS, QUICK_TASKS } from "./agents.js";
@@ -73,6 +75,39 @@ async function askAgent(agent, messages, isRetry = false) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data.text;
+}
+// ---- Saved chats ----------------------------------------------------------
+// Chats are kept in this browser only (not on a server), so they survive a
+// refresh. "New chat" clears one agent's chat.
+const CHATS_KEY = "mc-chats";
+function loadChats() {
+  const empty = Object.fromEntries(AGENTS.map((a) => [a.id, []]));
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHATS_KEY) || "{}");
+    for (const id of Object.keys(empty)) {
+      if (Array.isArray(saved[id])) empty[id] = saved[id].filter((m) => !m.pending);
+    }
+  } catch {}
+  return empty;
+}
+function saveChats(conversations) {
+  try {
+    const clean = Object.fromEntries(
+      Object.entries(conversations).map(([id, list]) => [id, list.filter((m) => !m.pending)]),
+    );
+    localStorage.setItem(CHATS_KEY, JSON.stringify(clean));
+  } catch {}
+}
+// The server only accepts a limited amount of history (see ask-agent.js), so
+// long chats send just the most recent part. The first message must be Lars's.
+const HISTORY_MESSAGES = 30;
+const HISTORY_CHARACTERS = 50000;
+function recentHistory(messages) {
+  let recent = messages.slice(-HISTORY_MESSAGES);
+  const size = (list) => list.reduce((n, m) => n + m.content.length, 0);
+  while (recent.length > 1 && size(recent) > HISTORY_CHARACTERS) recent = recent.slice(1);
+  while (recent.length > 1 && recent[0].role !== "user") recent = recent.slice(1);
+  return recent;
 }
 function StatusPill({ status, color }) {
   return (
@@ -125,19 +160,19 @@ function AgentCard({ agent, onClick, active }) {
           <div style={{ fontWeight: 800, fontSize: 13, color: agent.color, letterSpacing: 1 }}>
             {agent.name}
           </div>
-          <div style={{ fontSize: 10, color: "#888" }}>{agent.title}</div>
+          <div style={{ fontSize: 10, color: C.muted }}>{agent.title}</div>
         </div>
         <StatusPill status={agent.status} color={agent.color} />
       </div>
-      <div style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>{agent.description}</div>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{agent.description}</div>
       <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
         {agent.capabilities.map((c) => (
           <span
             key={c}
             style={{
-              fontSize: 9,
+              fontSize: 10,
               background: "#333",
-              color: "#888",
+              color: C.muted,
               borderRadius: 3,
               padding: "2px 6px",
             }}
@@ -188,10 +223,10 @@ function ChatBubble({ msg }) {
           border: `1px solid ${isUser ? "#CC5520" : "#2A2A2A"}`,
           borderRadius: isUser ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
           padding: "10px 14px",
-          fontSize: 13,
+          fontSize: 14,
           color: "#F0F0F0",
           lineHeight: 1.6,
-          whiteSpace: "pre-wrap",
+          whiteSpace: isUser ? "pre-wrap" : "normal",
         }}
       >
         {!isUser && (
@@ -207,7 +242,22 @@ function ChatBubble({ msg }) {
             {msg.agentName}
           </div>
         )}
-        {msg.content}
+        {isUser ? (
+          msg.content
+        ) : (
+          // Agents answer in Markdown (headings, bullets, tables). This turns it
+          // into proper formatting instead of showing stray # and * symbols.
+          <div className="mc-md">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
+              }}
+            >
+              {msg.content}
+            </ReactMarkdown>
+          </div>
+        )}
         {msg.pending && (
           <span style={{ display: "inline-flex", gap: 3, marginLeft: 6 }}>
             {[0, 1, 2].map((i) => (
@@ -217,7 +267,7 @@ function ChatBubble({ msg }) {
                   width: 5,
                   height: 5,
                   borderRadius: "50%",
-                  background: "#888",
+                  background: C.muted,
                   animation: `pulse 1.2s ${i * 0.2}s ease-in-out infinite`,
                 }}
               />
@@ -256,10 +306,10 @@ function QuickTaskButton({ label, onClick }) {
       style={{
         background: "#333",
         border: "1px solid #2A2A2A",
-        color: "#888",
+        color: C.muted,
         borderRadius: 6,
         padding: "6px 12px",
-        fontSize: 11,
+        fontSize: 12,
         cursor: "pointer",
         whiteSpace: "nowrap",
       }}
@@ -269,7 +319,7 @@ function QuickTaskButton({ label, onClick }) {
       }}
       onMouseLeave={(e) => {
         e.target.style.borderColor = "#2A2A2A";
-        e.target.style.color = "#888";
+        e.target.style.color = C.muted;
       }}
     >
       {label}
@@ -278,22 +328,29 @@ function QuickTaskButton({ label, onClick }) {
 }
 export default function MissionControl() {
   const [activeAgent, setActiveAgent] = useState(AGENTS[0]);
-  const [conversations, setConversations] = useState(() =>
-    Object.fromEntries(AGENTS.map((a) => [a.id, []])),
-  );
+  const [conversations, setConversations] = useState(loadChats);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState("chat");
   const [time, setTime] = useState(new Date());
-  const chatEndRef = useRef(null);
+  const chatScrollRef = useRef(null);
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+  // Keep the chats in this browser so a refresh doesn't wipe them.
+  useEffect(() => saveChats(conversations), [conversations]);
+  // Scroll only the chat panel to the newest message (not the whole page,
+  // which used to make the page jump when it first opened).
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversations, loading]);
+    const box = chatScrollRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [conversations, loading, activeAgent.id, view]);
   const msgs = conversations[activeAgent.id] || [];
+  function newChat() {
+    if (msgs.length && !window.confirm(`Start a new chat with ${activeAgent.name}?`)) return;
+    setConversations((c) => ({ ...c, [activeAgent.id]: [] }));
+  }
   async function send(text) {
     if (!text.trim() || loading) return;
     const userMsg = { role: "user", content: text };
@@ -317,9 +374,9 @@ export default function MissionControl() {
     }));
     try {
       // Error notes are only for Lars to see; they are never sent to the AI.
-      const apiMsgs = newMsgs
-        .filter((m) => !m.error)
-        .map((m) => ({ role: m.role, content: m.content }));
+      const apiMsgs = recentHistory(
+        newMsgs.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content })),
+      );
       const reply = await askAgent(activeAgent, apiMsgs);
       await saveMemory(activeAgent.name, "task", `User: ${text}\n\n${activeAgent.name}: ${reply}`, [
         activeAgent.focus,
@@ -369,7 +426,7 @@ export default function MissionControl() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        height: "100vh",
         background: "#0A0A0A",
         color: "#F0F0F0",
         fontFamily: "'Inter',system-ui,sans-serif",
@@ -377,7 +434,14 @@ export default function MissionControl() {
         flexDirection: "column",
       }}
     >
-      <style>{`*{box-sizing:border-box;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:#141414;}::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}@keyframes pulse{0%,100%{opacity:0.3;transform:scale(0.8);}50%{opacity:1;transform:scale(1.1);}}textarea:focus{outline:none;}button:active{transform:scale(0.97);}`}</style>
+      <style>{`*{box-sizing:border-box;}body{margin:0;}::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:#141414;}::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}@keyframes pulse{0%,100%{opacity:0.3;transform:scale(0.8);}50%{opacity:1;transform:scale(1.1);}}textarea:focus{outline:none;}button:active{transform:scale(0.97);}
+.mc-md>*:first-child{margin-top:0;}.mc-md>*:last-child{margin-bottom:0;}
+.mc-md p{margin:0 0 10px;}.mc-md ul,.mc-md ol{margin:0 0 10px;padding-left:22px;}.mc-md li{margin-bottom:4px;}
+.mc-md h1,.mc-md h2,.mc-md h3,.mc-md h4{margin:14px 0 6px;line-height:1.3;color:#fff;}.mc-md h1{font-size:18px;}.mc-md h2{font-size:16px;}.mc-md h3,.mc-md h4{font-size:15px;}
+.mc-md strong{color:#fff;}.mc-md a{color:#FF9A5C;}.mc-md hr{border:none;border-top:1px solid #2A2A2A;margin:12px 0;}
+.mc-md code{background:#0A0A0A;border-radius:4px;padding:1px 5px;font-size:13px;}.mc-md pre{background:#0A0A0A;border-radius:6px;padding:10px;overflow-x:auto;}.mc-md pre code{padding:0;}
+.mc-md blockquote{border-left:3px solid #FF6B2B;margin:0 0 10px;padding-left:10px;color:#A3A3A3;}
+.mc-md table{border-collapse:collapse;margin:0 0 10px;font-size:13px;display:block;overflow-x:auto;}.mc-md th,.mc-md td{border:1px solid #2A2A2A;padding:5px 9px;text-align:left;vertical-align:top;}.mc-md th{background:#141414;color:#fff;}`}</style>
       <div
         style={{
           background: "#141414",
@@ -407,7 +471,7 @@ export default function MissionControl() {
             <div style={{ fontWeight: 800, fontSize: 14, letterSpacing: 0.5 }}>
               BRANDBOY MISSION CONTROL
             </div>
-            <div style={{ fontSize: 10, color: "#888", letterSpacing: 1 }}>
+            <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1 }}>
               AI AGENT COMMAND CENTRE · SYDNEY AU
             </div>
           </div>
@@ -427,7 +491,7 @@ export default function MissionControl() {
               {AGENTS.length} AGENTS LIVE
             </span>
           </div>
-          <div style={{ fontSize: 12, color: "#888" }}>
+          <div style={{ fontSize: 12, color: C.muted }}>
             {time.toLocaleTimeString("en-AU", {
               hour: "2-digit",
               minute: "2-digit",
@@ -459,7 +523,7 @@ export default function MissionControl() {
               background: "none",
               border: "none",
               borderBottom: view === v ? "2px solid #FF6B2B" : "2px solid transparent",
-              color: view === v ? "#FF6B2B" : "#888",
+              color: view === v ? "#FF6B2B" : C.muted,
               padding: "10px 20px",
               fontSize: 12,
               fontWeight: view === v ? 700 : 400,
@@ -488,7 +552,7 @@ export default function MissionControl() {
           <div
             style={{
               fontSize: 10,
-              color: "#888",
+              color: C.muted,
               letterSpacing: 1,
               padding: "0 4px",
               marginBottom: 4,
@@ -536,7 +600,7 @@ export default function MissionControl() {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 12 }}>Lars</div>
-              <div style={{ fontSize: 10, color: "#888" }}>Commander · Brandboy</div>
+              <div style={{ fontSize: 10, color: C.muted }}>Commander · Brandboy</div>
             </div>
           </div>
         </div>
@@ -573,15 +637,32 @@ export default function MissionControl() {
                   <div style={{ fontWeight: 800, fontSize: 15, color: activeAgent.color }}>
                     {activeAgent.name}
                   </div>
-                  <div style={{ fontSize: 11, color: "#888" }}>
+                  <div style={{ fontSize: 11, color: C.muted }}>
                     {activeAgent.title} · {activeAgent.focus}
                   </div>
                 </div>
-                <div style={{ marginLeft: "auto" }}>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+                  {msgs.length > 0 && (
+                    <button
+                      onClick={newChat}
+                      disabled={loading}
+                      style={{
+                        background: C.faint,
+                        border: `1px solid ${C.border}`,
+                        color: C.text,
+                        borderRadius: 6,
+                        padding: "5px 12px",
+                        fontSize: 12,
+                        cursor: loading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      ＋ New chat
+                    </button>
+                  )}
                   <StatusPill status="● ONLINE 24/7" color={activeAgent.color} />
                 </div>
               </div>
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+              <div ref={chatScrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
                 {msgs.length === 0 && (
                   <div style={{ textAlign: "center", padding: "40px 20px" }}>
                     <div style={{ fontSize: 40, marginBottom: 12 }}>{activeAgent.emoji}</div>
@@ -598,7 +679,7 @@ export default function MissionControl() {
                     <div
                       style={{
                         fontSize: 13,
-                        color: "#888",
+                        color: C.muted,
                         maxWidth: 400,
                         margin: "0 auto",
                         lineHeight: 1.6,
@@ -624,7 +705,6 @@ export default function MissionControl() {
                 {msgs.map((msg, i) => (
                   <ChatBubble key={i} msg={msg} />
                 ))}
-                <div ref={chatEndRef} />
               </div>
               {msgs.length > 0 && (
                 <div
@@ -669,7 +749,7 @@ export default function MissionControl() {
                     border: "1px solid #2A2A2A",
                     borderRadius: 10,
                     color: "#F0F0F0",
-                    fontSize: 13,
+                    fontSize: 14,
                     padding: "10px 14px",
                     resize: "none",
                     minHeight: 44,
@@ -705,7 +785,7 @@ export default function MissionControl() {
                 <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>
                   Your AI Agent Team
                 </div>
-                <div style={{ fontSize: 13, color: "#888" }}>
+                <div style={{ fontSize: 13, color: C.muted }}>
                   {AGENTS.length} specialist agents working 24/7 across sales, marketing, BD, and
                   operations
                 </div>
@@ -754,7 +834,7 @@ export default function MissionControl() {
                         <div style={{ fontWeight: 800, fontSize: 16, color: a.color }}>
                           {a.name}
                         </div>
-                        <div style={{ fontSize: 12, color: "#888" }}>{a.title}</div>
+                        <div style={{ fontSize: 12, color: C.muted }}>{a.title}</div>
                       </div>
                     </div>
                     <div
@@ -764,7 +844,7 @@ export default function MissionControl() {
                     </div>
                     <div style={{ marginBottom: 12 }}>
                       <div
-                        style={{ fontSize: 10, color: "#888", letterSpacing: 1, marginBottom: 6 }}
+                        style={{ fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 6 }}
                       >
                         CAPABILITIES
                       </div>
@@ -816,7 +896,7 @@ export default function MissionControl() {
                 <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>
                   Brandboy AI Growth Strategy
                 </div>
-                <div style={{ fontSize: 13, color: "#888" }}>
+                <div style={{ fontSize: 13, color: C.muted }}>
                   Clear execution plan — what each agent does, when, and why
                 </div>
               </div>
@@ -913,7 +993,7 @@ export default function MissionControl() {
                       <span
                         style={{
                           background: "#333",
-                          color: "#888",
+                          color: C.muted,
                           borderRadius: 4,
                           fontSize: 10,
                           padding: "2px 8px",
