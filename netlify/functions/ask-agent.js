@@ -316,6 +316,7 @@ function webSearchRules() {
   return [
     `Today is ${today}.`,
     "You can search the web. Use it for anything current or specific: tenders, DAs, companies, people, prices, rankings.",
+    "Brandboy works in Australia, mainly NSW and Sydney. Search for Australian results (put NSW, Sydney or Australia in your searches), prefer .gov.au and .com.au sources, and leave out overseas results unless Lars asks for them.",
     "Use at most 3 searches, and keep the answer short enough to read on one screen.",
     "Never invent tenders, companies, names, phone numbers or emails. If you can't find something, say so plainly.",
   ].join(" ");
