@@ -298,13 +298,8 @@ const WEB_SEARCH_TOOL = {
   type: "web_search_20250305",
   name: "web_search",
   max_uses: 3,
-  user_location: {
-    type: "approximate",
-    city: "Sydney",
-    region: "New South Wales",
-    country: "AU",
-    timezone: "Australia/Sydney",
-  },
+  // Results for Australia as a whole (no particular city or state).
+  user_location: { type: "approximate", country: "AU", timezone: "Australia/Sydney" },
 };
 const CONTINUE_WITHIN_MS = 35000;
 
@@ -316,7 +311,7 @@ function webSearchRules() {
   return [
     `Today is ${today}.`,
     "You can search the web. Use it for anything current or specific: tenders, DAs, companies, people, prices, rankings.",
-    "Brandboy works in Australia, mainly NSW and Sydney. Search for Australian results (put NSW, Sydney or Australia in your searches), prefer .gov.au and .com.au sources, and leave out overseas results unless Lars asks for them.",
+    "Brandboy works across all of Australia. Search for Australian results (put Australia, or the state Lars mentions, in your searches), cover every state unless he names one, prefer .gov.au and .com.au sources, and leave out overseas results unless Lars asks for them.",
     "Use at most 3 searches, and keep the answer short enough to read on one screen.",
     "Never invent tenders, companies, names, phone numbers or emails. If you can't find something, say so plainly.",
   ].join(" ");
