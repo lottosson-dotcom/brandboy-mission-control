@@ -9,7 +9,7 @@
 // Settings (Netlify → Site configuration → Environment variables):
 //   SUPABASE_URL                e.g. https://igwmwhcnsmsxicmepvnj.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY   Supabase → Project Settings → API keys →
-//                               "service_role" (secret). Mark it as secret in
+//                               the Secret key (sb_secret_…). Mark it as secret in
 //                               Netlify. NEVER give it a VITE_ name: that would
 //                               put it in the website for anyone to see.
 // If these aren't set, logging is simply skipped and the app works as before.
@@ -39,7 +39,13 @@ function database() {
   if (!url || !key) return null;
   return {
     url: `${url.replace(/\/$/, "")}/rest/v1`,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: {
+      apikey: key,
+      // New-style keys (sb_secret_…) go in "apikey" only. Old-style keys
+      // (long tokens starting "eyJ") also need the Authorization header.
+      ...(key.startsWith("eyJ") && { Authorization: `Bearer ${key}` }),
+      "Content-Type": "application/json",
+    },
   };
 }
 
