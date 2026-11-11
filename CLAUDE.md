@@ -21,13 +21,13 @@ do; he relies on you for how.
 A single web page where Lars chats with a team of AI "agents" (SCOUT, COMPOSER, HUNTER,
 OPS, RANKR, NEXUS, FORGE). Each agent is Claude with different instructions.
 
-| Part                    | Where                            | What it does                                                   |
-| ----------------------- | -------------------------------- | -------------------------------------------------------------- |
-| Agent list              | `src/agents.js`                  | Names, colours, instructions, quick tasks. **Start here.**     |
-| Main screen             | `src/MissionControl.jsx`         | Everything you see on the page                                 |
-| Server function         | `netlify/functions/ask-agent.js` | Holds the Anthropic key, checks the passcode, calls Claude     |
-| Database (not used)     | `src/lib/`                       | Supabase helpers — switched off until login is added (phase 2) |
-| Activity log (not used) | `src/components/ActivityLog.jsx` | Waiting for the database                                       |
+| Part            | Where                            | What it does                                                    |
+| --------------- | -------------------------------- | --------------------------------------------------------------- |
+| Agent list      | `src/agents.js`                  | Names, colours, instructions, quick tasks. **Start here.**      |
+| Main screen     | `src/MissionControl.jsx`         | Everything you see on the page                                  |
+| Server function | `netlify/functions/ask-agent.js` | Holds the Anthropic key, checks the passcode, calls Claude      |
+| Activity log    | `src/components/ActivityLog.jsx` | Shows what agents did; read via `netlify/functions/activity.js` |
+| Database access | `netlify/lib/server.js`          | The ONLY code that talks to Supabase (server-side, service key) |
 
 Hosting: **Netlify** builds the site from GitHub `main` automatically.
 Pushing to `main` = **live within ~2 minutes**.
@@ -51,8 +51,11 @@ Pushing to `main` = **live within ~2 minutes**.
    folders. If something went wrong, make a new commit that fixes it.
 9. **Reuse before you add.** Look for an existing component, colour or function before
    writing a new one. Agent data lives only in `src/agents.js`.
-10. **Don't wire up Supabase** (memory, activity log) until login + Row Level Security are
-    in place. Otherwise prospect data would be readable by anyone. That's phase 2 with Eric.
+10. **The browser never talks to Supabase.** Only server functions do, through
+    `netlify/lib/server.js`, after checking the passcode. The tables keep Row Level
+    Security on with no policies, so the public key can't read anything. Never give the
+    Supabase service key a `VITE_` name (that would publish it). Agent memory and a real
+    login are phase 2 with Eric.
 
 ## Coding standards
 

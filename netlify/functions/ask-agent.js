@@ -18,6 +18,7 @@
 //   ANTHROPIC_MODEL     optional — defaults to DEFAULT_MODEL below
 // =============================================================================
 import { AGENTS } from "../../src/agents.js";
+import { reply, checkPasscode, logActivity } from "../lib/server.js";
 
 const DEFAULT_MODEL = "claude-sonnet-5-5";
 // Answers are streamed, and Netlify allows 60 seconds per answer, so there's
@@ -30,30 +31,15 @@ const MAX_TOTAL_CHARACTERS = 60000;
 const MAX_PDFS = 2;
 const MAX_PDF_CHARACTERS = 5_600_000;
 
-function reply(status, body) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 export default async (req) => {
   if (req.method !== "POST") {
     return reply(405, { error: "Method not allowed" });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const passcode = process.env.APP_PASSCODE;
-  if (!apiKey || !passcode) {
-    return reply(500, {
-      error: "Server is missing ANTHROPIC_API_KEY or APP_PASSCODE",
-    });
-  }
-
-  // Trim both sides so a stray space from copy-paste doesn't lock Lars out.
-  if ((req.headers.get("x-app-passcode") || "").trim() !== passcode.trim()) {
-    return reply(401, { error: "Wrong or missing passcode" });
-  }
+  if (!apiKey) return reply(500, { error: "Server is missing ANTHROPIC_API_KEY" });
+  const denied = checkPasscode(req);
+  if (denied) return denied;
 
   let body;
   try {
@@ -152,7 +138,20 @@ export default async (req) => {
           res = await callClaude(apiKey, request);
           if (!res.ok) throw new Error(`Claude returned ${res.status} on continue`);
         }
-        send(finalAnswer(content, stopReason));
+        const answer = finalAnswer(content, stopReason);
+        send(answer);
+        if (answer.type === "done") {
+          // One line in the Activity Log: who did what. Skipped if the
+          // database isn't set up; never breaks the chat.
+          const question = messages.at(-1);
+          await logActivity({
+            agent_name: agent.name,
+            action: shorten(question.content, 140),
+            detail: shorten(answer.text.replace(/[#*_>|`[\]]/g, ""), 220),
+            client_project: question.pdf ? `📄 ${question.pdf.name}` : null,
+            color: agent.color,
+          });
+        }
       } catch (err) {
         console.error("Streaming failed:", err);
         send({ type: "error", error: "Something went wrong part-way. Press Send to retry." });
@@ -164,6 +163,13 @@ export default async (req) => {
     headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" },
   });
 };
+
+function shorten(text, max) {
+  const flat = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
 
 function callClaude(apiKey, request) {
   return fetch("https://api.anthropic.com/v1/messages", {

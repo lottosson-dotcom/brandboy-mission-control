@@ -1,49 +1,29 @@
-import { supabase } from "./supabaseClient.js";
+// =============================================================================
+// ACTIVITY LOG (browser side)
+// =============================================================================
+// The browser never talks to the database directly. It asks the server
+// function /api/activity (passcode-protected), which reads the log.
+// =============================================================================
+import { readSavedPasscode, askForPasscode, savePasscode } from "./passcode.js";
 
-export async function logActivity({ agent_name, action, detail, client_project }) {
-  const { error } = await supabase.from("activity_log").insert([
-    {
-      agent_name,
-      action,
-      detail,
-      client_project,
-      color: getAgentColor(agent_name),
-    },
-  ]);
-  if (error) console.error("Activity log error:", error);
-}
-
-export async function getActivityLog(limit = 50) {
-  const { data, error } = await supabase
-    .from("activity_log")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) {
-    console.error("Fetch error:", error);
-    return [];
+// Returns { entries, notSetUp } or throws an Error with a readable message.
+export async function fetchActivity() {
+  const code = readSavedPasscode() || askForPasscode("Enter the Mission Control passcode");
+  if (!code) throw new Error("No passcode entered. Press Refresh to try again.");
+  const res = await fetch("/api/activity", { headers: { "x-app-passcode": code } });
+  if (res.status === 401) {
+    savePasscode("");
+    throw new Error("Wrong passcode. Press Refresh to try again.");
   }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Couldn't load the log (${res.status}).`);
   return data;
 }
 
-export function getAgentColor(agent_name) {
-  const colors = {
-    FORGE: "#3B82F6",
-    SPARKY: "#F59E0B",
-    REX: "#EF4444",
-    NOVA: "#8B5CF6",
-    PIXEL: "#10B981",
-    SYSTEM: "#6B7280",
-  };
-  return colors[agent_name?.toUpperCase()] || "#6B7280";
-}
-
 export function timeAgo(timestamp) {
-  const now = new Date();
-  const then = new Date(timestamp);
-  const seconds = Math.floor((now - then) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}hr ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
+  const seconds = Math.floor((Date.now() - new Date(timestamp)) / 1000);
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
+  return `${Math.floor(seconds / 86400)} d ago`;
 }

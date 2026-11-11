@@ -3,13 +3,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PdfChip } from "./components/PdfAttach.jsx";
 import { readPdf } from "./lib/pdf.js";
-// Memory and Activity Log are switched off until login is added (docs/PLAN.md, phase 2).
+import { readSavedPasscode, savePasscode, askForPasscode } from "./lib/passcode.js";
+import ActivityLog from "./components/ActivityLog.jsx";
+// Agent memory is switched off until login is added (docs/PLAN.md, phase 2).
 const saveMemory = async () => {};
-const ActivityLog = () => (
-  <div style={{ padding: "24px", color: C.muted, fontSize: "14px" }}>
-    📡 Activity Log — coming soon.
-  </div>
-);
 const C = {
   black: "#0A0A0A",
   charcoal: "#141414",
@@ -30,28 +27,6 @@ const C = {
   faint: "#333",
 };
 import { AGENTS, QUICK_TASKS } from "./agents.js";
-// The passcode is asked for once and remembered in this browser.
-// Cancel = nothing is saved and nothing is sent. A wrong passcode is forgotten
-// straight away so the next message asks again.
-const PASSCODE_KEY = "mc-passcode";
-function readSavedPasscode() {
-  try {
-    return localStorage.getItem(PASSCODE_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-function savePasscode(code) {
-  try {
-    if (code) localStorage.setItem(PASSCODE_KEY, code);
-    else localStorage.removeItem(PASSCODE_KEY);
-  } catch {}
-}
-function askForPasscode(message) {
-  const typed = (window.prompt(message) || "").trim();
-  savePasscode(typed);
-  return typed;
-}
 // onProgress(textSoFar) is called while the answer streams in, so the chat can
 // show the words as they're written. Returns the final, complete answer.
 async function askAgent(agent, messages, onProgress, isRetry = false) {
@@ -1213,11 +1188,7 @@ export default function MissionControl() {
               ))}
             </div>
           )}
-          {view === "activity" && (
-            <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-              <ActivityLog />
-            </div>
-          )}
+          {view === "activity" && <ActivityLog />}
         </div>
       </div>
     </div>

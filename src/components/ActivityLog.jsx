@@ -1,266 +1,152 @@
+// =============================================================================
+// ACTIVITY LOG SCREEN
+// =============================================================================
+// Shows what the agents have done, newest first: which agent, what Lars asked,
+// and the start of the answer. Every finished answer is logged automatically
+// by the server (netlify/functions/ask-agent.js).
+// =============================================================================
 import { useState, useEffect } from "react";
-import { getActivityLog, logActivity, getAgentColor, timeAgo } from "../lib/activityLog.js";
+import { AGENTS } from "../agents.js";
+import { fetchActivity, timeAgo } from "../lib/activityLog.js";
 
-const AGENTS = ["FORGE", "SPARKY", "REX", "NOVA", "PIXEL", "SYSTEM"];
+const MUTED = "#A3A3A3";
+const PANEL = "#1A1A1A";
+const BORDER = "#2A2A2A";
+const ACCENT = "#FF6B2B";
 
 export default function ActivityLog() {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState([]);
+  const [state, setState] = useState("loading"); // loading | ready | notSetUp | error
+  const [problem, setProblem] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
-  const [showManual, setShowManual] = useState(false);
-  const [manual, setManual] = useState({
-    agent_name: "SYSTEM",
-    action: "",
-    detail: "",
-    client_project: "",
-  });
 
-  async function fetchLogs() {
-    setLoading(true);
-    const data = await getActivityLog(100);
-    setLogs(data);
-    setLoading(false);
+  async function load() {
+    setState("loading");
+    try {
+      const data = await fetchActivity();
+      setEntries(data.entries || []);
+      setState(data.notSetUp ? "notSetUp" : "ready");
+    } catch (err) {
+      setProblem(err.message);
+      setState("error");
+    }
   }
 
   useEffect(() => {
-    fetchLogs();
+    load();
   }, []);
 
-  async function handleManualLog() {
-    if (!manual.action) return;
-    await logActivity(manual);
-    setManual({ agent_name: "SYSTEM", action: "", detail: "", client_project: "" });
-    setShowManual(false);
-    fetchLogs();
-  }
+  const term = search.toLowerCase();
+  const shown = entries.filter(
+    (e) =>
+      (filter === "ALL" || e.agent_name === filter) &&
+      [e.action, e.detail, e.client_project].some((t) => t?.toLowerCase().includes(term)),
+  );
 
-  const filtered = logs.filter((log) => {
-    const matchAgent = filter === "ALL" || log.agent_name === filter;
-    const matchSearch =
-      log.action?.toLowerCase().includes(search.toLowerCase()) ||
-      log.detail?.toLowerCase().includes(search.toLowerCase()) ||
-      log.client_project?.toLowerCase().includes(search.toLowerCase());
-    return matchAgent && matchSearch;
+  const pill = (active, color) => ({
+    background: active ? color + "22" : "#141414",
+    border: `1px solid ${active ? color : BORDER}`,
+    color: active ? color : MUTED,
+    borderRadius: 6,
+    padding: "5px 12px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
   });
 
   return (
-    <div
-      style={{
-        background: "#0a0a0a",
-        minHeight: "100vh",
-        padding: "24px",
-        color: "white",
-        fontFamily: "monospace",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-        }}
-      >
-        <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "#f97316" }}>🔴 ACTIVITY LOG</h1>
-        <div style={{ display: "flex", gap: "12px" }}>
-          <button
-            onClick={fetchLogs}
-            style={{
-              background: "#1f2937",
-              color: "white",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            ↻ Refresh
-          </button>
-          <button
-            onClick={() => setShowManual(!showManual)}
-            style={{
-              background: "#f97316",
-              color: "white",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            + Log Entry
-          </button>
-        </div>
-      </div>
-      {showManual && (
-        <div
-          style={{
-            background: "#1f2937",
-            padding: "16px",
-            borderRadius: "8px",
-            marginBottom: "24px",
-          }}
-        >
-          <h3 style={{ marginBottom: "12px", color: "#f97316" }}>Manual Log Entry</h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "12px",
-              marginBottom: "12px",
-            }}
-          >
-            <select
-              value={manual.agent_name}
-              onChange={(e) => setManual({ ...manual, agent_name: e.target.value })}
-              style={{
-                background: "#111827",
-                color: "white",
-                border: "1px solid #374151",
-                padding: "8px",
-                borderRadius: "6px",
-              }}
-            >
-              {AGENTS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder="Client / Project"
-              value={manual.client_project}
-              onChange={(e) => setManual({ ...manual, client_project: e.target.value })}
-              style={{
-                background: "#111827",
-                color: "white",
-                border: "1px solid #374151",
-                padding: "8px",
-                borderRadius: "6px",
-              }}
-            />
-            <input
-              placeholder="Action (required)"
-              value={manual.action}
-              onChange={(e) => setManual({ ...manual, action: e.target.value })}
-              style={{
-                background: "#111827",
-                color: "white",
-                border: "1px solid #374151",
-                padding: "8px",
-                borderRadius: "6px",
-              }}
-            />
-            <input
-              placeholder="Detail"
-              value={manual.detail}
-              onChange={(e) => setManual({ ...manual, detail: e.target.value })}
-              style={{
-                background: "#111827",
-                color: "white",
-                border: "1px solid #374151",
-                padding: "8px",
-                borderRadius: "6px",
-              }}
-            />
+    <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>📡 Activity Log</div>
+          <div style={{ fontSize: 13, color: MUTED }}>
+            Everything the agents have done, newest first.
           </div>
-          <button
-            onClick={handleManualLog}
-            style={{
-              background: "#f97316",
-              color: "white",
-              border: "none",
-              padding: "8px 24px",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            Save Entry
-          </button>
         </div>
-      )}
-      <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
-        <button
-          onClick={() => setFilter("ALL")}
-          style={{
-            background: filter === "ALL" ? "#f97316" : "#1f2937",
-            color: "white",
-            border: "none",
-            padding: "6px 14px",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={load} style={{ ...pill(false, ACCENT), marginLeft: "auto" }}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <button onClick={() => setFilter("ALL")} style={pill(filter === "ALL", ACCENT)}>
           ALL
         </button>
         {AGENTS.map((a) => (
           <button
-            key={a}
-            onClick={() => setFilter(a)}
-            style={{
-              background: filter === a ? getAgentColor(a) : "#1f2937",
-              color: "white",
-              border: "none",
-              padding: "6px 14px",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
+            key={a.id}
+            onClick={() => setFilter(a.name)}
+            style={pill(filter === a.name, a.color)}
           >
-            {a}
+            {a.emoji} {a.name}
           </button>
         ))}
       </div>
       <input
-        placeholder="Search logs..."
+        placeholder="Search the log…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         style={{
           width: "100%",
-          background: "#1f2937",
-          color: "white",
-          border: "1px solid #374151",
-          padding: "10px",
-          borderRadius: "6px",
-          marginBottom: "24px",
-          boxSizing: "border-box",
+          background: "#141414",
+          border: `1px solid ${BORDER}`,
+          borderRadius: 8,
+          color: "#F0F0F0",
+          padding: "9px 12px",
+          fontSize: 14,
+          marginBottom: 16,
+          fontFamily: "inherit",
         }}
       />
-      {loading ? (
-        <p style={{ color: "#6b7280" }}>Loading...</p>
-      ) : filtered.length === 0 ? (
-        <p style={{ color: "#6b7280" }}>No activity found.</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {filtered.map((log) => (
+
+      {state === "loading" && <div style={{ color: MUTED }}>Loading…</div>}
+      {state === "error" && <div style={{ color: "#EF4444" }}>⚠️ {problem}</div>}
+      {state === "notSetUp" && (
+        <div style={{ color: MUTED, lineHeight: 1.6 }}>
+          The Activity Log isn't connected to the database yet. Eric needs to add the Supabase
+          settings in Netlify (see README). The chat works fine without it.
+        </div>
+      )}
+      {state === "ready" && shown.length === 0 && (
+        <div style={{ color: MUTED }}>
+          {entries.length === 0
+            ? "Nothing yet. Ask any agent something and it will show up here."
+            : "Nothing matches that filter."}
+        </div>
+      )}
+      {state === "ready" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {shown.map((e) => (
             <div
-              key={log.id}
+              key={e.id}
               style={{
-                background: "#111827",
-                borderLeft: `4px solid ${log.color || "#6b7280"}`,
-                padding: "12px 16px",
-                borderRadius: "6px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                background: PANEL,
+                border: `1px solid ${BORDER}`,
+                borderLeft: `3px solid ${e.color || MUTED}`,
+                borderRadius: 8,
+                padding: "10px 14px",
               }}
             >
-              <div>
-                <span
-                  style={{ color: log.color || "#6b7280", fontWeight: "bold", marginRight: "12px" }}
-                >
-                  {log.agent_name}
+              <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                <span style={{ color: e.color || MUTED, fontWeight: 800, fontSize: 12 }}>
+                  {e.agent_name}
                 </span>
-                <span style={{ color: "#f3f4f6", marginRight: "12px" }}>{log.action}</span>
-                {log.client_project && (
-                  <span style={{ color: "#9ca3af", marginRight: "12px" }}>
-                    — {log.client_project}
-                  </span>
-                )}
-                {log.detail && <span style={{ color: "#6b7280" }}>{log.detail}</span>}
+                <span style={{ fontSize: 14, color: "#F0F0F0" }}>{e.action}</span>
+                <span
+                  style={{ marginLeft: "auto", fontSize: 11, color: MUTED, whiteSpace: "nowrap" }}
+                >
+                  {timeAgo(e.created_at)}
+                </span>
               </div>
-              <span style={{ color: "#6b7280", fontSize: "12px", whiteSpace: "nowrap" }}>
-                {timeAgo(log.created_at)}
-              </span>
+              {e.client_project && (
+                <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{e.client_project}</div>
+              )}
+              {e.detail && (
+                <div style={{ fontSize: 13, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>
+                  {e.detail}
+                </div>
+              )}
             </div>
           ))}
         </div>
