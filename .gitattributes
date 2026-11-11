@@ -1,0 +1,3 @@
+# Keep line endings the same on Mac and Windows (Prettier expects LF)
+* text=auto eol=lf
+*.png binary

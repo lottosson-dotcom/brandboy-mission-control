@@ -1,4 +1,9 @@
+# Netlify settings. Netlify reads this every time it builds the site.
 [build]
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
+
+[functions]
+  # Lets the server function import src/agents.js.
+  node_bundler = "esbuild"
