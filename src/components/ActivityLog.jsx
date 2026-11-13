@@ -7,7 +7,12 @@
 // =============================================================================
 import { useState, useEffect } from "react";
 import { AGENTS } from "../agents.js";
-import { fetchActivity, timeAgo } from "../lib/activityLog.js";
+import { DAILY_SCANS } from "../scans.js";
+import { fetchActivity, runScansNow, timeAgo } from "../lib/activityLog.js";
+import ScanReport from "./ScanReport.jsx";
+
+// Matches SCAN_LABEL in netlify/lib/scans.js: marks daily-scan reports.
+const SCAN_LABEL = "🕕 Daily scan";
 
 const MUTED = "#A3A3A3";
 const PANEL = "#1A1A1A";
@@ -20,6 +25,24 @@ export default function ActivityLog() {
   const [problem, setProblem] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [scanNote, setScanNote] = useState("");
+
+  async function runScans() {
+    setScanNote("⏳ Running the daily scans… this takes about 30 seconds.");
+    try {
+      const results = await runScansNow();
+      const failed = results.filter((r) => !r.ok).length;
+      setScanNote(
+        failed
+          ? `Done, but ${failed} of ${results.length} scans didn't finish. See below.`
+          : `✓ Done: ${results.length} scan reports added below.`,
+      );
+      setFilter("SCANS");
+      load();
+    } catch (err) {
+      setScanNote(`⚠️ ${err.message}`);
+    }
+  }
 
   async function load() {
     setState("loading");
@@ -40,7 +63,9 @@ export default function ActivityLog() {
   const term = search.toLowerCase();
   const shown = entries.filter(
     (e) =>
-      (filter === "ALL" || e.agent_name === filter) &&
+      (filter === "ALL" ||
+        e.agent_name === filter ||
+        (filter === "SCANS" && e.client_project === SCAN_LABEL)) &&
       [e.action, e.detail, e.client_project].some((t) => t?.toLowerCase().includes(term)),
   );
 
@@ -64,14 +89,30 @@ export default function ActivityLog() {
             Everything the agents have done, newest first.
           </div>
         </div>
-        <button onClick={load} style={{ ...pill(false, ACCENT), marginLeft: "auto" }}>
-          ↻ Refresh
-        </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            onClick={runScans}
+            disabled={scanNote.startsWith("⏳")}
+            style={pill(true, ACCENT)}
+          >
+            🕕 Run scans now
+          </button>
+          <button onClick={load} style={pill(false, ACCENT)}>
+            ↻ Refresh
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: MUTED, marginBottom: 12, lineHeight: 1.5 }}>
+        Daily scans (every morning around 6am): {DAILY_SCANS.map((s) => s.name).join(" · ")}
+        {scanNote && <div style={{ color: "#F0F0F0", marginTop: 4 }}>{scanNote}</div>}
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button onClick={() => setFilter("ALL")} style={pill(filter === "ALL", ACCENT)}>
           ALL
+        </button>
+        <button onClick={() => setFilter("SCANS")} style={pill(filter === "SCANS", ACCENT)}>
+          🕕 DAILY SCANS
         </button>
         {AGENTS.map((a) => (
           <button
@@ -142,7 +183,8 @@ export default function ActivityLog() {
               {e.client_project && (
                 <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{e.client_project}</div>
               )}
-              {e.detail && (
+              {e.detail && e.client_project === SCAN_LABEL && <ScanReport text={e.detail} />}
+              {e.detail && e.client_project !== SCAN_LABEL && (
                 <div style={{ fontSize: 13, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>
                   {e.detail}
                 </div>

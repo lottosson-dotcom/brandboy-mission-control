@@ -20,6 +20,23 @@ export async function fetchActivity() {
   return data;
 }
 
+// Runs the daily scans straight away. Returns [{ name, ok }] or throws.
+export async function runScansNow() {
+  const code = readSavedPasscode() || askForPasscode("Enter the Mission Control passcode");
+  if (!code) throw new Error("No passcode entered.");
+  const res = await fetch("/api/run-scans", {
+    method: "POST",
+    headers: { "x-app-passcode": code },
+  });
+  if (res.status === 401) {
+    savePasscode("");
+    throw new Error("Wrong passcode. Try again.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `The scans couldn't run (${res.status}).`);
+  return data.results || [];
+}
+
 export function timeAgo(timestamp) {
   const seconds = Math.floor((Date.now() - new Date(timestamp)) / 1000);
   if (seconds < 60) return "just now";

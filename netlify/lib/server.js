@@ -71,6 +71,23 @@ export async function logActivity({ agent_name, action, detail, client_project, 
   }
 }
 
+// The most recent log entry with exactly this action, or null. Used by the
+// daily scans to compare today's report with yesterday's.
+export async function readLatestEntry(action) {
+  const db = database();
+  if (!db) return null;
+  try {
+    const res = await fetch(
+      `${db.url}/activity_log?select=detail,created_at&action=eq.${encodeURIComponent(action)}&order=created_at.desc&limit=1`,
+      { headers: db.headers, signal: AbortSignal.timeout(4000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json())[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function readActivity(limit = 100) {
   const db = database();
   const res = await fetch(
