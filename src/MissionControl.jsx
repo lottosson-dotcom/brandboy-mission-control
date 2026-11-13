@@ -7,6 +7,7 @@ import { accessHeaders, accessRefused, loginEnabled, logOut } from "./lib/auth.j
 import ActivityLog from "./components/ActivityLog.jsx";
 import DailyTasks from "./components/DailyTasks.jsx";
 import Contacts from "./components/Contacts.jsx";
+import Inbox from "./components/Inbox.jsx";
 // Agent memory is switched off until login is added (docs/PLAN.md, phase 2).
 const saveMemory = async () => {};
 const C = {
@@ -362,7 +363,15 @@ export default function MissionControl() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState("chat");
+  // Coming back from Google's "Connect Gmail" screen (?gmail=connected etc.):
+  // open the Inbox tab and show what happened, then tidy the address bar.
+  const [gmailResult, setGmailResult] = useState(() =>
+    new URLSearchParams(window.location.search).get("gmail"),
+  );
+  const [view, setView] = useState(gmailResult ? "inbox" : "chat");
+  useEffect(() => {
+    if (gmailResult) window.history.replaceState(null, "", window.location.pathname);
+  }, [gmailResult]);
   const [time, setTime] = useState(new Date());
   const chatScrollRef = useRef(null);
   useEffect(() => {
@@ -565,6 +574,7 @@ export default function MissionControl() {
           ["chat", "💬 Talk to Agent"],
           ["agents", "🤖 All Agents"],
           ["strategy", "📋 Strategy"],
+          ["inbox", "📥 Inbox"],
           ["contacts", "👥 Contacts"],
           ["tasks", "🕕 Daily Tasks"],
           ["activity", "📡 Activity Log"],
@@ -1198,6 +1208,9 @@ export default function MissionControl() {
                 </div>
               ))}
             </div>
+          )}
+          {view === "inbox" && (
+            <Inbox result={gmailResult} onResultShown={() => setGmailResult(null)} />
           )}
           {view === "contacts" && <Contacts />}
           {view === "tasks" && <DailyTasks />}
