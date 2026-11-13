@@ -218,6 +218,25 @@ export async function deleteContact(id) {
   return rows.length > 0;
 }
 
+// ---- Gmail connection (table created by docs/supabase/gmail_connection.sql) ---
+
+export async function readGmailConnection() {
+  return (await dbRequest("gmail_connection?select=*&id=eq.1"))[0] || null;
+}
+
+// Replaces the saved connection (there's only ever one).
+export async function saveGmailConnection({ email, refresh_token, scopes }) {
+  await dbRequest("gmail_connection?id=eq.1", { method: "DELETE" });
+  await dbRequest("gmail_connection", {
+    method: "POST",
+    body: { id: 1, email, refresh_token, scopes, connected_at: new Date().toISOString() },
+  });
+}
+
+export function deleteGmailConnection() {
+  return dbRequest("gmail_connection?id=eq.1", { method: "DELETE" });
+}
+
 export async function readActivity(limit = 100) {
   const db = database();
   const res = await fetch(
