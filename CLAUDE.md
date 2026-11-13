@@ -21,16 +21,18 @@ do; he relies on you for how.
 A single web page where Lars chats with a team of AI "agents" (SCOUT, COMPOSER, HUNTER,
 OPS, RANKR, NEXUS, FORGE). Each agent is Claude with different instructions.
 
-| Part            | Where                                          | What it does                                                          |
-| --------------- | ---------------------------------------------- | --------------------------------------------------------------------- |
-| Agent list      | `src/agents.js`                                | Names, colours, instructions, quick tasks. **Start here.**            |
-| Main screen     | `src/MissionControl.jsx`                       | Everything you see on the page                                        |
-| Server function | `netlify/functions/ask-agent.js`               | Holds the Anthropic key, checks the login, calls Claude               |
-| Login           | `src/lib/auth.js`, `src/components/Login*.jsx` | Email login link (Supabase Auth); who's allowed: `ALLOWED_EMAILS`     |
-| Company brief   | `src/agents.js` → `BRANDBOY_BRIEF`             | What every agent knows about Brandboy (Lars's wording)                |
-| Daily tasks     | 🕕 Daily Tasks tab (`daily_tasks` table)       | What agents do by themselves each morning; Lars edits them in the app |
-| Activity log    | `src/components/ActivityLog.jsx`               | Shows what agents did; read via `netlify/functions/activity.js`       |
-| Database access | `netlify/lib/server.js`                        | The ONLY code that talks to Supabase (server-side, service key)       |
+| Part            | Where                                          | What it does                                                                                   |
+| --------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Agent list      | `src/agents.js`                                | Names, colours, instructions, quick tasks. **Start here.**                                     |
+| Main screen     | `src/MissionControl.jsx`                       | Everything you see on the page                                                                 |
+| Server function | `netlify/functions/ask-agent.js`               | Holds the Anthropic key, checks the login, calls Claude                                        |
+| Login           | `src/lib/auth.js`, `src/components/Login*.jsx` | Email login link (Supabase Auth); who's allowed: `ALLOWED_EMAILS`                              |
+| Company brief   | `src/agents.js` → `BRANDBOY_BRIEF`             | What every agent knows about Brandboy (Lars's wording)                                         |
+| Daily tasks     | 🕕 Daily Tasks tab (`daily_tasks` table)       | What agents do by themselves each morning; Lars edits them in the app                          |
+| Contacts        | 👥 Contacts tab (`contacts` table)             | Customers, suppliers, prospects; Excel import; used by the inbox agent                         |
+| Inbox / Gmail   | 📥 Inbox tab, `netlify/lib/gmail.js`           | Lars connects Gmail; agents read it and save drafts (never send). Setup: `docs/gmail-setup.md` |
+| Activity log    | `src/components/ActivityLog.jsx`               | Shows what agents did; read via `netlify/functions/activity.js`                                |
+| Database access | `netlify/lib/server.js`                        | The ONLY code that talks to Supabase (server-side, service key)                                |
 
 Hosting: **Netlify** builds the site from GitHub `main` automatically.
 Pushing to `main` = **live within ~2 minutes**.
@@ -43,6 +45,8 @@ Pushing to `main` = **live within ~2 minutes**.
    It only lets in a logged-in user whose email is on `ALLOWED_EMAILS` (or the old
    passcode, while `APP_PASSCODE` is still set). Without it anyone could use Brandboy's
    Anthropic account. The browser never chooses the model or the agent instructions.
+   The one exception is `gmail-callback.js` (Google's return trip can't carry the login);
+   it only accepts the signed ticket that `/api/gmail` gives a logged-in user.
 3. **Small steps.** One change at a time; make sure it works; commit; then the next.
 4. **Always run `npm run check` before saying you're done.** It must pass. (The
    before-finishing hook runs lint + build automatically and sends you back if they fail.)

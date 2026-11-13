@@ -142,7 +142,7 @@ export async function readLatestEntry(action) {
 
 // ---- Daily tasks (table created by docs/supabase/daily_tasks.sql) -------------
 
-// Thrown when the daily_tasks table hasn't been created yet.
+// Thrown when a table (daily_tasks, contacts) hasn't been created yet.
 export class TableMissingError extends Error {}
 
 // One request to the database. Returns the JSON reply (or null when empty).
@@ -158,7 +158,7 @@ async function dbRequest(path, { method = "GET", body } = {}) {
   const text = await res.text();
   if (!res.ok) {
     if (res.status === 404 || text.includes("PGRST205") || text.includes("does not exist")) {
-      throw new TableMissingError("The daily_tasks table hasn't been set up yet.");
+      throw new TableMissingError(`The ${path.split("?")[0]} table hasn't been set up yet.`);
     }
     throw new Error(`Database ${method} ${path} failed: ${res.status} ${text}`);
   }
@@ -190,6 +190,51 @@ export async function deleteTask(id) {
     method: "DELETE",
   });
   return rows.length > 0;
+}
+
+// ---- Contacts (table created by docs/supabase/contacts.sql) -------------------
+
+const CONTACT_FIELDS = "id,kind,company,name,email,phone,notes,source,created_at,updated_at";
+
+export function listContacts() {
+  return dbRequest(`contacts?select=${CONTACT_FIELDS}&order=company.asc,name.asc&limit=10000`);
+}
+
+// Adds one or many contacts in one go. Returns the saved rows.
+export function createContacts(rows) {
+  return dbRequest("contacts", { method: "POST", body: rows });
+}
+
+export async function updateContact(id, changes) {
+  const rows = await dbRequest(`contacts?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { ...changes, updated_at: new Date().toISOString() },
+  });
+  return rows[0] || null;
+}
+
+export async function deleteContact(id) {
+  const rows = await dbRequest(`contacts?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+  return rows.length > 0;
+}
+
+// ---- Gmail connection (table created by docs/supabase/gmail_connection.sql) ---
+
+export async function readGmailConnection() {
+  return (await dbRequest("gmail_connection?select=*&id=eq.1"))[0] || null;
+}
+
+// Replaces the saved connection (there's only ever one).
+export async function saveGmailConnection({ email, refresh_token, scopes }) {
+  await dbRequest("gmail_connection?id=eq.1", { method: "DELETE" });
+  await dbRequest("gmail_connection", {
+    method: "POST",
+    body: { id: 1, email, refresh_token, scopes, connected_at: new Date().toISOString() },
+  });
+}
+
+export function deleteGmailConnection() {
+  return dbRequest("gmail_connection?id=eq.1", { method: "DELETE" });
 }
 
 export async function readActivity(limit = 100) {

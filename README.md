@@ -50,6 +50,8 @@ anything live without asking you first.
 | `ALLOWED_EMAILS`                | Who can log in, comma-separated, e.g. `lars@brandboy.com.au,eric@zignet.com.au`                                                      |
 | `VITE_SUPABASE_URL`             | `https://igwmwhcnsmsxicmepvnj.supabase.co` (for the login; safe to be public)                                                        |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API keys → **Publishable key** (`sb_publishable_…`; safe to be public)                                 |
+| `GOOGLE_CLIENT_ID`              | For Gmail: Google Cloud → OAuth client ID. See `docs/gmail-setup.md`                                                                 |
+| `GOOGLE_CLIENT_SECRET`          | For Gmail: the OAuth client secret. Mark as **secret**                                                                               |
 | `ANTHROPIC_MODEL`               | Optional. Defaults to `claude-sonnet-5-5`                                                                                            |
 | `SUPABASE_URL`                  | `https://igwmwhcnsmsxicmepvnj.supabase.co` (for the Activity Log)                                                                    |
 | `SUPABASE_SERVICE_ROLE_KEY`     | Supabase → Project Settings → API keys → the **Secret key** (`sb_secret_…`). Mark as **secret**. Server only: never name it `VITE_…` |
