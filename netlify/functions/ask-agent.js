@@ -17,7 +17,7 @@
 //   APP_PASSCODE        required — the passcode Lars types into the website
 //   ANTHROPIC_MODEL     optional — defaults to DEFAULT_MODEL below
 // =============================================================================
-import { AGENTS } from "../../src/agents.js";
+import { AGENTS, BRANDBOY_BRIEF } from "../../src/agents.js";
 import { reply, checkPasscode, logActivity } from "../lib/server.js";
 
 const DEFAULT_MODEL = "claude-sonnet-5-5";
@@ -95,7 +95,10 @@ export default async (req) => {
     // quick chat answers, so thinking is turned off: faster and never blank.
     // (This setting only exists on Sonnet 5.5; other models skip it.)
     ...(model === "claude-sonnet-5-5" && { thinking: { type: "between_tools" } }),
-    system: agent.webSearch ? `${agent.systemPrompt}\n\n${webSearchRules()}` : agent.systemPrompt,
+    // Every agent gets the shared Brandboy brief first, then its own job.
+    system: [BRANDBOY_BRIEF, agent.systemPrompt, agent.webSearch && webSearchRules()]
+      .filter(Boolean)
+      .join("\n\n"),
     ...(agent.webSearch && { tools: [WEB_SEARCH_TOOL] }),
     messages: messages.map(toClaudeMessage),
   };

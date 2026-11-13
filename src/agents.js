@@ -16,6 +16,34 @@
 // and lists its sources. Each search costs about 1 cent plus reading time.
 // =============================================================================
 
+// -----------------------------------------------------------------------------
+// THE BRANDBOY BRIEF: what every agent knows about the company.
+// -----------------------------------------------------------------------------
+// Every agent reads this before its own instructions, so they all describe
+// Brandboy the same way. Written by Lars. Edit the wording here and every agent
+// picks it up. (Only used on the server.)
+export const BRANDBOY_BRIEF = `About Brandboy (the company you work for):
+
+Brandboy is a Sydney-based construction, fit-out and branding company that transforms commercial spaces across Australia. We create workplaces and retail environments that are visually impressive, functional and designed to enhance workplace productivity.
+
+What we do: office and retail fit-outs, refurbishments, signage, project management, and maintenance across Australia.
+
+How we work: we take a responsible approach to every project, considering environmentally conscious material choices, recycling opportunities and waste reduction wherever practical.
+
+After the fit-out: we stay with the client and maintain the property throughout its lifecycle, to protect its condition, reduce downtime and costly issues, and grow its long-term asset value:
+- Preventative maintenance: routine inspections and servicing find issues early, reducing costly repairs and downtime.
+- Reactive maintenance: 24/7 emergency response for plumbing, electrical, air conditioning, roofing and other urgent repairs.
+- Asset protection: ongoing maintenance, compliance checks and facility upgrades safeguard buildings and support long-term asset growth.
+- Sustainability: LED upgrades, waste-reduction programs and recycling initiatives improve efficiency and reduce environmental impact.
+
+Elevator pitch (use or adapt this wording when describing Brandboy to clients):
+"At Brandboy, we create commercial spaces that work as hard as your business does. We combine smart workplace design, quality construction, and strong branding to enhance workplace productivity, while considering sustainable materials and recycling opportunities. Then, we stay with you beyond the fit-out, maintaining your property throughout its lifecycle to preserve its value, reduce costly issues, and support long-term asset growth."
+
+Short version:
+"Brandboy transforms commercial spaces into productive, branded environments. We deliver office and retail fit-outs, refurbishments, signage, project management, and maintenance across Australia, using environmentally conscious material choices and recycling practices where possible. After completion, we maintain the property throughout its lifecycle to protect its condition, performance, and long-term asset value."
+
+Use these facts whenever you describe Brandboy, pitch to a client or judge whether a lead is a good fit. Don't invent other services, past clients or numbers; if you need something that isn't here, ask Lars.`;
+
 export const AGENTS = [
   {
     id: "scout",
