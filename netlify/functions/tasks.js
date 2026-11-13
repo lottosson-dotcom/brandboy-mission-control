@@ -11,7 +11,7 @@
 import { AGENTS } from "../../src/agents.js";
 import {
   reply,
-  checkPasscode,
+  checkAccess,
   databaseIsSetUp,
   listTasks,
   createTask,
@@ -57,7 +57,7 @@ async function tooManyEnabled(excludeId) {
 }
 
 export default async (req) => {
-  const denied = checkPasscode(req);
+  const denied = await checkAccess(req);
   if (denied) return denied;
   if (!databaseIsSetUp()) return reply(200, { tasks: [], notSetUp: true });
 
