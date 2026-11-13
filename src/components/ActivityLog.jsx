@@ -7,12 +7,11 @@
 // =============================================================================
 import { useState, useEffect } from "react";
 import { AGENTS } from "../agents.js";
-import { DAILY_SCANS } from "../scans.js";
-import { fetchActivity, runScansNow, timeAgo } from "../lib/activityLog.js";
+import { fetchActivity, runTasksNow, timeAgo } from "../lib/activityLog.js";
 import ScanReport from "./ScanReport.jsx";
 
-// Matches SCAN_LABEL in netlify/lib/scans.js: marks daily-scan reports.
-const SCAN_LABEL = "🕕 Daily scan";
+// Matches SCAN_LABEL in netlify/lib/scans.js: marks daily-task reports.
+const SCAN_LABEL = "🕕 Daily task";
 
 const MUTED = "#A3A3A3";
 const PANEL = "#1A1A1A";
@@ -28,14 +27,14 @@ export default function ActivityLog() {
   const [scanNote, setScanNote] = useState("");
 
   async function runScans() {
-    setScanNote("⏳ Running the daily scans… this takes about 30 seconds.");
+    setScanNote("⏳ Running the daily tasks… this takes about 30 seconds.");
     try {
-      const results = await runScansNow();
+      const results = await runTasksNow();
       const failed = results.filter((r) => !r.ok).length;
       setScanNote(
         failed
-          ? `Done, but ${failed} of ${results.length} scans didn't finish. See below.`
-          : `✓ Done: ${results.length} scan reports added below.`,
+          ? `Done, but ${failed} of ${results.length} tasks didn't finish. See below.`
+          : `✓ Done: ${results.length} reports added below.`,
       );
       setFilter("SCANS");
       load();
@@ -95,7 +94,7 @@ export default function ActivityLog() {
             disabled={scanNote.startsWith("⏳")}
             style={pill(true, ACCENT)}
           >
-            🕕 Run scans now
+            🕕 Run daily tasks now
           </button>
           <button onClick={load} style={pill(false, ACCENT)}>
             ↻ Refresh
@@ -103,7 +102,7 @@ export default function ActivityLog() {
         </div>
       </div>
       <div style={{ fontSize: 12, color: MUTED, marginBottom: 12, lineHeight: 1.5 }}>
-        Daily scans (every morning around 6am): {DAILY_SCANS.map((s) => s.name).join(" · ")}
+        Daily tasks run every morning around 6am. Set them up on the 🕕 Daily Tasks tab.
         {scanNote && <div style={{ color: "#F0F0F0", marginTop: 4 }}>{scanNote}</div>}
       </div>
 
@@ -112,7 +111,7 @@ export default function ActivityLog() {
           ALL
         </button>
         <button onClick={() => setFilter("SCANS")} style={pill(filter === "SCANS", ACCENT)}>
-          🕕 DAILY SCANS
+          🕕 DAILY TASKS
         </button>
         {AGENTS.map((a) => (
           <button

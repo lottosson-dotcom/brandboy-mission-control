@@ -88,6 +88,58 @@ export async function readLatestEntry(action) {
   }
 }
 
+// ---- Daily tasks (table created by docs/supabase/daily_tasks.sql) -------------
+
+// Thrown when the daily_tasks table hasn't been created yet.
+export class TableMissingError extends Error {}
+
+// One request to the database. Returns the JSON reply (or null when empty).
+async function dbRequest(path, { method = "GET", body } = {}) {
+  const db = database();
+  if (!db) throw new Error("Database not set up");
+  const res = await fetch(`${db.url}/${path}`, {
+    method,
+    headers: { ...db.headers, Prefer: "return=representation" },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(8000),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    if (res.status === 404 || text.includes("PGRST205") || text.includes("does not exist")) {
+      throw new TableMissingError("The daily_tasks table hasn't been set up yet.");
+    }
+    throw new Error(`Database ${method} ${path} failed: ${res.status} ${text}`);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+const TASK_FIELDS = "id,agent_id,name,prompt,enabled,created_at,updated_at";
+
+export function listTasks({ enabledOnly = false } = {}) {
+  return dbRequest(
+    `daily_tasks?select=${TASK_FIELDS}&order=created_at.asc${enabledOnly ? "&enabled=eq.true" : ""}`,
+  );
+}
+
+export async function createTask(task) {
+  return (await dbRequest("daily_tasks", { method: "POST", body: task }))[0];
+}
+
+export async function updateTask(id, changes) {
+  const rows = await dbRequest(`daily_tasks?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { ...changes, updated_at: new Date().toISOString() },
+  });
+  return rows[0] || null;
+}
+
+export async function deleteTask(id) {
+  const rows = await dbRequest(`daily_tasks?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  return rows.length > 0;
+}
+
 export async function readActivity(limit = 100) {
   const db = database();
   const res = await fetch(

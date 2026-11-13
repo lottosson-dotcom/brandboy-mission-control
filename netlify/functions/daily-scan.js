@@ -1,16 +1,21 @@
 // =============================================================================
-// SCHEDULED FUNCTION: runs the daily scans every morning
+// SCHEDULED FUNCTION: runs the agents' daily tasks every morning
 // =============================================================================
 // Netlify runs this by itself on the schedule below; nobody visits a page.
-// It only runs on the LIVE site (not on previews). To test it any time, use the
-// "Run scans now" button on the Activity Log tab (netlify/functions/run-scans.js).
-// What gets searched: src/scans.js.
+// It only runs on the LIVE site (not on previews). To test any time, use
+// "Run now" on the Daily Tasks tab (netlify/functions/run-scans.js).
+// What gets done: the switched-on tasks on the Daily Tasks tab.
 // =============================================================================
-import { runAllScans } from "../lib/scans.js";
+import { runTasks } from "../lib/scans.js";
+import { databaseIsSetUp } from "../lib/server.js";
 
 export default async () => {
-  const results = await runAllScans();
-  console.log("Daily scans:", JSON.stringify(results));
+  if (!databaseIsSetUp()) return;
+  try {
+    console.log("Daily tasks:", JSON.stringify(await runTasks()));
+  } catch (err) {
+    console.error("Daily tasks couldn't run:", err);
+  }
 };
 
 export const config = {
