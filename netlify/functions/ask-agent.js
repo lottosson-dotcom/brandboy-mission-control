@@ -15,12 +15,19 @@
 // Settings (Netlify → Site configuration → Environment variables):
 //   ANTHROPIC_API_KEY   required — the Anthropic key
 //   APP_PASSCODE        required — the passcode Lars types into the website
-//   ANTHROPIC_MODEL     optional — defaults to DEFAULT_MODEL below
+//   ANTHROPIC_MODEL     optional — defaults to DEFAULT_MODEL in netlify/lib/claude.js
 // =============================================================================
 import { AGENTS } from "../../src/agents.js";
 import { reply, checkPasscode, logActivity } from "../lib/server.js";
+import {
+  buildRequest,
+  callClaude,
+  readClaudeStream,
+  finalAnswer,
+  shorten,
+  CONTINUE_WITHIN_MS,
+} from "../lib/claude.js";
 
-const DEFAULT_MODEL = "claude-sonnet-5-5";
 // Answers are streamed, and Netlify allows 60 seconds per answer, so there's
 // room for long answers (about 2,000 words).
 const MAX_OUTPUT_TOKENS = 3000;
@@ -86,19 +93,7 @@ export default async (req) => {
     });
   }
 
-  const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-  const request = {
-    model,
-    max_tokens: MAX_OUTPUT_TOKENS,
-    // Sonnet 5.5 "thinks" before answering by default, and that thinking uses
-    // up the token limit above, which could leave the answer empty. These are
-    // quick chat answers, so thinking is turned off: faster and never blank.
-    // (This setting only exists on Sonnet 5.5; other models skip it.)
-    ...(model === "claude-sonnet-5-5" && { thinking: { type: "between_tools" } }),
-    system: agent.webSearch ? `${agent.systemPrompt}\n\n${webSearchRules()}` : agent.systemPrompt,
-    ...(agent.webSearch && { tools: [WEB_SEARCH_TOOL] }),
-    messages: messages.map(toClaudeMessage),
-  };
+  const request = buildRequest(agent, messages.map(toClaudeMessage), MAX_OUTPUT_TOKENS);
   const originalMessages = request.messages;
 
   // The first call to Claude happens before we start answering, so problems
@@ -164,112 +159,6 @@ export default async (req) => {
   });
 };
 
-function shorten(text, max) {
-  const flat = String(text || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
-}
-
-function callClaude(apiKey, request) {
-  return fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({ ...request, stream: true }),
-  });
-}
-
-// Reads Claude's live answer (server-sent events) and rebuilds the full reply
-// from it, while passing each new piece of text on as it arrives.
-async function readClaudeStream(res, { onText, onSearch }) {
-  const blocks = [];
-  const toolInput = {};
-  let stopReason = null;
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let cut;
-    while ((cut = buffer.indexOf("\n\n")) !== -1) {
-      const chunk = buffer.slice(0, cut);
-      buffer = buffer.slice(cut + 2);
-      const line = chunk.split("\n").find((l) => l.startsWith("data:"));
-      if (!line) continue;
-      const event = JSON.parse(line.slice(5));
-      if (event.type === "content_block_start") {
-        const block = structuredClone(event.content_block);
-        if (block.type === "text") block.text ||= "";
-        blocks[event.index] = block;
-        if (block.type === "server_tool_use") onSearch();
-      } else if (event.type === "content_block_delta") {
-        const block = blocks[event.index];
-        const d = event.delta;
-        if (d.type === "text_delta") {
-          block.text += d.text;
-          onText(d.text);
-        } else if (d.type === "input_json_delta") {
-          toolInput[event.index] = (toolInput[event.index] || "") + d.partial_json;
-        } else if (d.type === "citations_delta") {
-          (block.citations ||= []).push(d.citation);
-        } else if (d.type === "thinking_delta") {
-          block.thinking = (block.thinking || "") + d.thinking;
-        } else if (d.type === "signature_delta") {
-          block.signature = d.signature;
-        }
-      } else if (event.type === "content_block_stop") {
-        if (toolInput[event.index] !== undefined) {
-          blocks[event.index].input = JSON.parse(toolInput[event.index] || "{}");
-        }
-      } else if (event.type === "message_delta") {
-        stopReason = event.delta?.stop_reason ?? stopReason;
-      } else if (event.type === "error") {
-        throw new Error(event.error?.message || "Claude stream error");
-      }
-    }
-  }
-  return { blocks: blocks.filter(Boolean), stopReason };
-}
-
-// Works out the final answer to show, or a friendly error.
-function finalAnswer(content, stopReason) {
-  if (stopReason === "refusal") {
-    return { type: "error", error: "The agent declined that request. Try rephrasing it." };
-  }
-  for (const block of content) {
-    if (block.type === "web_search_tool_result" && block.content?.error_code) {
-      console.error("Web search failed:", block.content.error_code);
-    }
-  }
-  // Only keep the text written after the last search: the final answer, not
-  // the "I'll search for…" notes in between.
-  const lastSearch = content.findLastIndex(
-    (block) => block.type === "server_tool_use" || block.type === "web_search_tool_result",
-  );
-  const textBlocks = content.slice(lastSearch + 1).filter((block) => block.type === "text");
-  let text = textBlocks
-    .map((block) => block.text)
-    .join("")
-    .trim();
-  if (!text) {
-    console.error("Empty answer", stopReason);
-    return {
-      type: "error",
-      error: "The agent didn't manage an answer that time. Press Send to retry.",
-    };
-  }
-  if (stopReason === "max_tokens" || stopReason === "pause_turn") {
-    text += "\n\n_(Answer cut short. Ask me to continue.)_";
-  }
-  return { type: "done", text: text + sourcesList(textBlocks) };
-}
-
 // ---- PDFs ----------------------------------------------------------------------
 // A message with a PDF becomes "here's a document" + the question. The PDF is
 // marked for caching, so follow-up questions about it cost about a tenth.
@@ -287,52 +176,6 @@ function toClaudeMessage(m) {
       { type: "text", text: m.content || "Please read this document." },
     ],
   };
-}
-
-// ---- Web search ----------------------------------------------------------------
-// Only agents with `webSearch: true` in src/agents.js get this. Searches are
-// capped so one answer can't take too long or cost too much.
-const WEB_SEARCH_TOOL = {
-  // The basic version: searches directly. (The newer "dynamic filtering"
-  // version runs extra code per search, which was slower and less reliable.)
-  type: "web_search_20250305",
-  name: "web_search",
-  max_uses: 3,
-  user_location: {
-    type: "approximate",
-    city: "Sydney",
-    region: "New South Wales",
-    country: "AU",
-    timezone: "Australia/Sydney",
-  },
-};
-const CONTINUE_WITHIN_MS = 35000;
-
-function webSearchRules() {
-  const today = new Date().toLocaleDateString("en-AU", {
-    dateStyle: "long",
-    timeZone: "Australia/Sydney",
-  });
-  return [
-    `Today is ${today}.`,
-    "You can search the web. Use it for anything current or specific: tenders, DAs, companies, people, prices, rankings.",
-    "Use at most 3 searches, and keep the answer short enough to read on one screen.",
-    "Never invent tenders, companies, names, phone numbers or emails. If you can't find something, say so plainly.",
-  ].join(" ");
-}
-
-// Turns the web pages Claude quoted into a "Sources" list of links, so Lars can
-// check where each fact came from.
-function sourcesList(textBlocks) {
-  const seen = new Map();
-  for (const block of textBlocks) {
-    for (const c of block.citations || []) {
-      if (c.url && !seen.has(c.url)) seen.set(c.url, (c.title || c.url).replace(/[[\]]/g, ""));
-    }
-  }
-  if (!seen.size) return "";
-  const links = [...seen].slice(0, 8).map(([url, title]) => `- [${title}](${url})`);
-  return `\n\n**Sources**\n${links.join("\n")}`;
 }
 
 export const config = {

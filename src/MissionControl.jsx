@@ -5,6 +5,7 @@ import { PdfChip } from "./components/PdfAttach.jsx";
 import { readPdf } from "./lib/pdf.js";
 import { readSavedPasscode, savePasscode, askForPasscode } from "./lib/passcode.js";
 import ActivityLog from "./components/ActivityLog.jsx";
+import DailyTasks from "./components/DailyTasks.jsx";
 // Agent memory is switched off until login is added (docs/PLAN.md, phase 2).
 const saveMemory = async () => {};
 const C = {
@@ -574,6 +575,7 @@ export default function MissionControl() {
           ["chat", "💬 Talk to Agent"],
           ["agents", "🤖 All Agents"],
           ["strategy", "📋 Strategy"],
+          ["tasks", "🕕 Daily Tasks"],
           ["activity", "📡 Activity Log"],
         ].map(([v, label]) => (
           <button
@@ -1188,6 +1190,7 @@ export default function MissionControl() {
               ))}
             </div>
           )}
+          {view === "tasks" && <DailyTasks />}
           {view === "activity" && <ActivityLog />}
         </div>
       </div>
