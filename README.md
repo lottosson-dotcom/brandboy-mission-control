@@ -43,13 +43,16 @@ anything live without asking you first.
 
 ### Live site settings (Netlify → Site configuration → Environment variables)
 
-| Name                        | What                                                                                                                                 |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ANTHROPIC_API_KEY`         | Anthropic API key (set a monthly spend limit at console.anthropic.com)                                                               |
-| `APP_PASSCODE`              | Passcode typed into the site the first time                                                                                          |
-| `ANTHROPIC_MODEL`           | Optional. Defaults to `claude-sonnet-5-5`                                                                                            |
-| `SUPABASE_URL`              | `https://igwmwhcnsmsxicmepvnj.supabase.co` (for the Activity Log)                                                                    |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API keys → the **Secret key** (`sb_secret_…`). Mark as **secret**. Server only: never name it `VITE_…` |
+| Name                            | What                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`             | Anthropic API key (set a monthly spend limit at console.anthropic.com)                                                               |
+| `APP_PASSCODE`                  | Old shared passcode. Delete it once the login works, to switch the passcode off                                                      |
+| `ALLOWED_EMAILS`                | Who can log in, comma-separated, e.g. `lars@brandboy.com.au,eric@zignet.com.au`                                                      |
+| `VITE_SUPABASE_URL`             | `https://igwmwhcnsmsxicmepvnj.supabase.co` (for the login; safe to be public)                                                        |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API keys → **Publishable key** (`sb_publishable_…`; safe to be public)                                 |
+| `ANTHROPIC_MODEL`               | Optional. Defaults to `claude-sonnet-5-5`                                                                                            |
+| `SUPABASE_URL`                  | `https://igwmwhcnsmsxicmepvnj.supabase.co` (for the Activity Log)                                                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase → Project Settings → API keys → the **Secret key** (`sb_secret_…`). Mark as **secret**. Server only: never name it `VITE_…` |
 
 ## Project layout
 
