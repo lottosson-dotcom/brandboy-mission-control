@@ -1,27 +1,27 @@
 // =============================================================================
 // TALKING TO THE SERVER (everything except the chat, which streams)
 // =============================================================================
-// Adds the passcode, asks for it if needed, and turns problems into a sentence
-// Lars can read. Returns the server's JSON reply, or throws an Error.
+// Adds the login (or passcode), and turns problems into a sentence Lars can
+// read. Returns the server's JSON reply, or throws an Error.
 // =============================================================================
-import { readSavedPasscode, askForPasscode, savePasscode } from "./passcode.js";
+import { accessHeaders, accessRefused } from "./auth.js";
 
-export async function callApi(path, { method = "GET", body } = {}) {
-  const code = readSavedPasscode() || askForPasscode("Enter the Mission Control passcode");
-  if (!code) throw new Error("No passcode entered. Try again.");
+export async function callApi(path, { method = "GET", body } = {}, askAgain = false) {
+  const headers = await accessHeaders(askAgain);
   let res;
   try {
     res = await fetch(path, {
       method,
-      headers: { "x-app-passcode": code, ...(body && { "Content-Type": "application/json" }) },
+      headers: { ...headers, ...(body && { "Content-Type": "application/json" }) },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new Error("Couldn't reach Mission Control. Check the internet connection and try again.");
   }
-  if (res.status === 401) {
-    savePasscode("");
-    throw new Error("Wrong passcode. Try again.");
+  if (res.status === 401 || res.status === 403) {
+    if ((await accessRefused()) && !askAgain) return callApi(path, { method, body }, true);
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Not allowed. Please log in again.");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);

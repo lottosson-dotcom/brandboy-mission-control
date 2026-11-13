@@ -21,15 +21,16 @@ do; he relies on you for how.
 A single web page where Lars chats with a team of AI "agents" (SCOUT, COMPOSER, HUNTER,
 OPS, RANKR, NEXUS, FORGE). Each agent is Claude with different instructions.
 
-| Part            | Where                                    | What it does                                                          |
-| --------------- | ---------------------------------------- | --------------------------------------------------------------------- |
-| Agent list      | `src/agents.js`                          | Names, colours, instructions, quick tasks. **Start here.**            |
-| Main screen     | `src/MissionControl.jsx`                 | Everything you see on the page                                        |
-| Server function | `netlify/functions/ask-agent.js`         | Holds the Anthropic key, checks the passcode, calls Claude            |
-| Company brief   | `src/agents.js` → `BRANDBOY_BRIEF`       | What every agent knows about Brandboy (Lars's wording)                |
-| Daily tasks     | 🕕 Daily Tasks tab (`daily_tasks` table) | What agents do by themselves each morning; Lars edits them in the app |
-| Activity log    | `src/components/ActivityLog.jsx`         | Shows what agents did; read via `netlify/functions/activity.js`       |
-| Database access | `netlify/lib/server.js`                  | The ONLY code that talks to Supabase (server-side, service key)       |
+| Part            | Where                                          | What it does                                                          |
+| --------------- | ---------------------------------------------- | --------------------------------------------------------------------- |
+| Agent list      | `src/agents.js`                                | Names, colours, instructions, quick tasks. **Start here.**            |
+| Main screen     | `src/MissionControl.jsx`                       | Everything you see on the page                                        |
+| Server function | `netlify/functions/ask-agent.js`               | Holds the Anthropic key, checks the login, calls Claude               |
+| Login           | `src/lib/auth.js`, `src/components/Login*.jsx` | Email login link (Supabase Auth); who's allowed: `ALLOWED_EMAILS`     |
+| Company brief   | `src/agents.js` → `BRANDBOY_BRIEF`             | What every agent knows about Brandboy (Lars's wording)                |
+| Daily tasks     | 🕕 Daily Tasks tab (`daily_tasks` table)       | What agents do by themselves each morning; Lars edits them in the app |
+| Activity log    | `src/components/ActivityLog.jsx`               | Shows what agents did; read via `netlify/functions/activity.js`       |
+| Database access | `netlify/lib/server.js`                        | The ONLY code that talks to Supabase (server-side, service key)       |
 
 Hosting: **Netlify** builds the site from GitHub `main` automatically.
 Pushing to `main` = **live within ~2 minutes**.
@@ -38,7 +39,9 @@ Pushing to `main` = **live within ~2 minutes**.
 
 1. **Never put keys or passwords in code.** They go in `.env` (this computer) or Netlify
    environment variables (live site). `.env` is never committed and you must not read it.
-2. **The passcode check in `ask-agent.js` stays.** Without it anyone could use Brandboy's
+2. **Every server function starts with `await checkAccess(req)`** (`netlify/lib/server.js`).
+   It only lets in a logged-in user whose email is on `ALLOWED_EMAILS` (or the old
+   passcode, while `APP_PASSCODE` is still set). Without it anyone could use Brandboy's
    Anthropic account. The browser never chooses the model or the agent instructions.
 3. **Small steps.** One change at a time; make sure it works; commit; then the next.
 4. **Always run `npm run check` before saying you're done.** It must pass. (The
@@ -53,11 +56,10 @@ Pushing to `main` = **live within ~2 minutes**.
    folders. If something went wrong, make a new commit that fixes it.
 9. **Reuse before you add.** Look for an existing component, colour or function before
    writing a new one. Agent data lives only in `src/agents.js`.
-10. **The browser never talks to Supabase.** Only server functions do, through
-    `netlify/lib/server.js`, after checking the passcode. The tables keep Row Level
-    Security on with no policies, so the public key can't read anything. Never give the
-    Supabase service key a `VITE_` name (that would publish it). Agent memory and a real
-    login are phase 2 with Eric.
+10. **The browser only uses Supabase to log in** (`src/lib/auth.js`). All data goes
+    through server functions (`netlify/lib/server.js`) after `checkAccess`. The tables
+    keep Row Level Security on with no policies, so the public key can't read anything.
+    Never give the Supabase secret key a `VITE_` name (that would publish it).
 
 ## Coding standards
 
