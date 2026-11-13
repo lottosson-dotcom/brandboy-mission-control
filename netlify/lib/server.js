@@ -146,12 +146,15 @@ export async function readLatestEntry(action) {
 export class TableMissingError extends Error {}
 
 // One request to the database. Returns the JSON reply (or null when empty).
-async function dbRequest(path, { method = "GET", body } = {}) {
+async function dbRequest(path, { method = "GET", body, prefer } = {}) {
   const db = database();
   if (!db) throw new Error("Database not set up");
   const res = await fetch(`${db.url}/${path}`, {
     method,
-    headers: { ...db.headers, Prefer: "return=representation" },
+    headers: {
+      ...db.headers,
+      Prefer: ["return=representation", prefer].filter(Boolean).join(","),
+    },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(8000),
   });
@@ -235,6 +238,51 @@ export async function saveGmailConnection({ email, refresh_token, scopes }) {
 
 export function deleteGmailConnection() {
   return dbRequest("gmail_connection?id=eq.1", { method: "DELETE" });
+}
+
+// ---- Inbox items (table created by docs/supabase/inbox_items.sql) -------------
+
+const INBOX_FIELDS =
+  "id,message_id,thread_id,from_name,from_email,subject,received_at,category,summary,needs_reply,draft_id,contact_id,contact_kind,contact_name,status";
+
+export function listInboxItems(limit = 60) {
+  return dbRequest(
+    `inbox_items?select=${INBOX_FIELDS}&order=received_at.desc.nullslast&limit=${Number(limit) || 60}`,
+  );
+}
+
+// Which of these Gmail ids have already been sorted. Returns a Set.
+export async function sortedMessageIds(messageIds) {
+  if (!messageIds.length) return new Set();
+  const list = messageIds.map((id) => `"${String(id).replace(/[^\w-]/g, "")}"`).join(",");
+  const rows = await dbRequest(`inbox_items?select=message_id&message_id=in.(${list})`);
+  return new Set(rows.map((r) => r.message_id));
+}
+
+export function addInboxItems(rows) {
+  // If two checks run at once, an email already saved is skipped, not an error.
+  return rows.length
+    ? dbRequest("inbox_items?on_conflict=message_id", {
+        method: "POST",
+        body: rows,
+        prefer: "resolution=ignore-duplicates",
+      })
+    : [];
+}
+
+export async function readInboxItem(id) {
+  return (
+    (await dbRequest(`inbox_items?select=${INBOX_FIELDS}&id=eq.${encodeURIComponent(id)}`))[0] ||
+    null
+  );
+}
+
+export async function updateInboxItem(id, changes) {
+  const rows = await dbRequest(`inbox_items?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: changes,
+  });
+  return rows[0] || null;
 }
 
 export async function readActivity(limit = 100) {

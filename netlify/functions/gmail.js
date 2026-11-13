@@ -1,7 +1,7 @@
 // =============================================================================
 // SERVER FUNCTION: the Gmail connection (the "Inbox" tab)
 // =============================================================================
-//   GET    /api/gmail            is Gmail connected? + the 5 newest emails
+//   GET    /api/gmail            is Gmail connected (and still working)?
 //   POST   /api/gmail            start connecting: returns the Google link
 //   DELETE /api/gmail            disconnect (cancels the pass at Google too)
 // The return trip from Google is netlify/functions/gmail-callback.js.
@@ -14,13 +14,7 @@ import {
   deleteGmailConnection,
   TableMissingError,
 } from "../lib/server.js";
-import {
-  gmailIsSetUp,
-  googleLoginLink,
-  accessKey,
-  cancelPass,
-  latestEmails,
-} from "../lib/gmail.js";
+import { gmailIsSetUp, googleLoginLink, accessKey, cancelPass } from "../lib/gmail.js";
 
 export default async (req) => {
   const denied = await checkAccess(req);
@@ -49,8 +43,9 @@ export default async (req) => {
       connectedAt: connection.connected_at,
     };
     try {
-      const key = await accessKey(connection.refresh_token);
-      return reply(200, { ...status, latest: await latestEmails(key, 5) });
+      // Proves the connection still works (Google can cancel it).
+      await accessKey(connection.refresh_token);
+      return reply(200, status);
     } catch (err) {
       console.error("Gmail check failed:", err);
       if (err.needsReconnect) {

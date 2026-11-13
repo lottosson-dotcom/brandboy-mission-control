@@ -142,34 +142,7 @@ export async function gmail(key, path, { method = "GET", body } = {}) {
   return data;
 }
 
-// The newest emails in the inbox: [{ id, threadId, from, subject, date, snippet, unread }].
-export async function latestEmails(key, howMany = 5) {
-  const list = await gmail(
-    key,
-    `messages?maxResults=${howMany}&q=${encodeURIComponent("in:inbox")}`,
-  );
-  return Promise.all(
-    (list.messages || []).map(async ({ id }) => {
-      const m = await gmail(
-        key,
-        `messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-      );
-      const header = (name) =>
-        m.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-      return {
-        id,
-        threadId: m.threadId,
-        from: header("From"),
-        subject: header("Subject"),
-        date: header("Date"),
-        snippet: plainText(m.snippet || ""),
-        unread: (m.labelIds || []).includes("UNREAD"),
-      };
-    }),
-  );
-}
-
-// Gmail sends previews with HTML codes like &#39; for an apostrophe.
+// Turns HTML codes like &#39; (an apostrophe) back into normal characters.
 function plainText(text) {
   return text
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
@@ -177,4 +150,105 @@ function plainText(text) {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");
+}
+
+// ---- Reading a whole email ----------------------------------------------------
+
+// Splits 'Jo Smith <jo@acme.com.au>' into { name: "Jo Smith", email: "jo@acme.com.au" }.
+export function splitAddress(from) {
+  const match = String(from || "").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (match) return { name: match[1].trim(), email: match[2].trim().toLowerCase() };
+  return {
+    name: "",
+    email: String(from || "")
+      .trim()
+      .toLowerCase(),
+  };
+}
+
+// The readable text of an email: the plain-text part if there is one,
+// otherwise the HTML part with the tags taken out.
+function bodyText(payload) {
+  const parts = [];
+  (function walk(part) {
+    if (!part) return;
+    if (part.body?.data) parts.push(part);
+    (part.parts || []).forEach(walk);
+  })(payload);
+  const decode = (p) => Buffer.from(p.body.data, "base64url").toString("utf8");
+  const plain = parts.find((p) => p.mimeType === "text/plain");
+  if (plain) return decode(plain);
+  const html = parts.find((p) => p.mimeType === "text/html");
+  if (!html) return "";
+  return plainText(
+    decode(html)
+      .replace(/<(style|script)[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " "),
+  );
+}
+
+// Everything the inbox agent needs about one email.
+export async function readEmail(key, id) {
+  const m = await gmail(key, `messages/${id}?format=full`);
+  const header = (name) =>
+    m.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+  const date = header("Date");
+  return {
+    id,
+    threadId: m.threadId,
+    from: splitAddress(header("From")),
+    replyTo: header("Reply-To") ? splitAddress(header("Reply-To")).email : "",
+    subject: header("Subject"),
+    receivedAt: date && !isNaN(new Date(date)) ? new Date(date).toISOString() : null,
+    messageIdHeader: header("Message-ID"),
+    references: header("References"),
+    // Long threads quote everything before; the newest part is what matters.
+    body: bodyText(m.payload)
+      .replace(/\r/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+      .slice(0, 3000),
+  };
+}
+
+// ---- Saving a reply draft -----------------------------------------------------
+
+// Email headers can only hold plain English letters; anything else (å, é, –)
+// must be wrapped in this special encoding.
+function encodeHeader(text) {
+  return /^[\x20-\x7E]*$/.test(text)
+    ? text
+    : `=?UTF-8?B?${Buffer.from(text, "utf8").toString("base64")}?=`;
+}
+
+// Saves a reply to `email` in Gmail's Drafts, in the same conversation.
+// Lars opens it in Gmail, checks it and presses Send himself.
+export async function saveReplyDraft(key, email, replyText) {
+  const subject = /^re:/i.test(email.subject) ? email.subject : `Re: ${email.subject}`;
+  const lines = [
+    `To: ${email.replyTo || email.from.email}`,
+    `Subject: ${encodeHeader(subject)}`,
+    ...(email.messageIdHeader
+      ? [
+          `In-Reply-To: ${email.messageIdHeader}`,
+          `References: ${[email.references, email.messageIdHeader].filter(Boolean).join(" ")}`,
+        ]
+      : []),
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    // Email lines are kept to 76 characters, as the email rules require.
+    ...Buffer.from(replyText.replace(/\r?\n/g, "\r\n"), "utf8")
+      .toString("base64")
+      .match(/.{1,76}/g),
+  ];
+  const raw = Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
+  const draft = await gmail(key, "drafts", {
+    method: "POST",
+    body: { message: { raw, threadId: email.threadId } },
+  });
+  return draft.id;
 }

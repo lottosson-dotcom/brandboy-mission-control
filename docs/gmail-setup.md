@@ -57,6 +57,8 @@ Netlify → Site configuration → Environment variables → Add:
 ## 6. Supabase
 
 Supabase → SQL Editor → New query → paste `docs/supabase/gmail_connection.sql` → **Run**.
+Then do the same with `docs/supabase/inbox_items.sql` (where the inbox agent keeps the
+emails it has sorted).
 
 ## 7. Lars connects
 
@@ -69,3 +71,12 @@ not from preview links, because Google only accepts the address in step 4.
 
 **To disconnect:** Inbox tab → **Disconnect**, or in Google: myaccount.google.com →
 Security → Your connections to third-party apps.
+
+## 8. Using the inbox agent
+
+On the Inbox tab, press **✉️ Check inbox now**. COMPOSER reads up to 8 new emails
+from the last 3 days, sorts them (🔥 new lead, ❓ enquiry, customer, supplier,
+other), writes a one-line summary, and saves a reply draft in Gmail where
+someone is waiting for an answer. **Nothing is sent.** Lars opens the draft
+("Reply draft ready: open in Gmail"), changes anything in [square brackets],
+and presses Send himself. Unknown senders get **＋ Add as prospect**.

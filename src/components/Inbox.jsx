@@ -1,13 +1,13 @@
 // =============================================================================
 // INBOX SCREEN: Lars's Gmail in Mission Control
 // =============================================================================
-// Step 1 (this screen): connect Gmail and see the newest emails, to prove it
-// works. Next: the inbox agent sorts new emails (lead, enquiry, customer,
-// supplier), summarises them and saves reply drafts in Gmail for Lars to send.
+// Lars connects his Gmail here once. After that, the inbox agent (COMPOSER)
+// sorts new emails and saves reply drafts in Gmail: see InboxItems.jsx.
 // =============================================================================
 import { useState, useEffect } from "react";
 import { callApi } from "../lib/api.js";
 import { MUTED, BORDER, ACCENT, RED, button, bigButton } from "../lib/styles.js";
+import InboxItems from "./InboxItems.jsx";
 
 // What Google's return trip means (?gmail=… in the address).
 const RESULTS = {
@@ -19,10 +19,6 @@ const RESULTS = {
   failed:
     "⚠️ Google didn't finish connecting. Try again in a minute; if it keeps failing, ask Eric.",
 };
-
-function sender(from) {
-  return from.replace(/<.*>/, "").replace(/"/g, "").trim() || from;
-}
 
 export default function Inbox({ result, onResultShown }) {
   const [info, setInfo] = useState(null);
@@ -147,53 +143,7 @@ export default function Inbox({ result, onResultShown }) {
             </div>
           )}
           {info.problem && <div style={{ color: RED, marginBottom: 12 }}>⚠️ {info.problem}</div>}
-          {info.latest && (
-            <>
-              <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>
-                Newest in your inbox:
-              </div>
-              <div style={{ borderTop: `1px solid ${BORDER}` }}>
-                {info.latest.map((m) => (
-                  <div
-                    key={m.id}
-                    style={{
-                      padding: "9px 4px",
-                      borderBottom: `1px solid ${BORDER}`,
-                      fontSize: 13,
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <b style={{ fontWeight: m.unread ? 800 : 500 }}>{sender(m.from)}</b>
-                      <span style={{ marginLeft: "auto", color: MUTED, fontSize: 12 }}>
-                        {m.date
-                          ? new Date(m.date).toLocaleString("en-AU", {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })
-                          : ""}
-                      </span>
-                    </div>
-                    <div style={{ fontWeight: m.unread ? 700 : 400 }}>
-                      {m.subject || "(no subject)"}
-                    </div>
-                    <div
-                      style={{
-                        color: MUTED,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {m.snippet}
-                    </div>
-                  </div>
-                ))}
-                {info.latest.length === 0 && (
-                  <div style={{ color: MUTED, padding: 10 }}>The inbox is empty.</div>
-                )}
-              </div>
-            </>
-          )}
+          {!info.needsReconnect && <InboxItems account={info.email} />}
         </>
       )}
     </div>
