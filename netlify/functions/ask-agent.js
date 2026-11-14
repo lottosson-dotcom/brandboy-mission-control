@@ -18,7 +18,7 @@
 //   ANTHROPIC_MODEL     optional — defaults to DEFAULT_MODEL in netlify/lib/claude.js
 // =============================================================================
 import { AGENTS } from "../../src/agents.js";
-import { reply, checkPasscode, logActivity } from "../lib/server.js";
+import { reply, checkAccess, logActivity } from "../lib/server.js";
 import {
   buildRequest,
   callClaude,
@@ -45,7 +45,7 @@ export default async (req) => {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return reply(500, { error: "Server is missing ANTHROPIC_API_KEY" });
-  const denied = checkPasscode(req);
+  const denied = await checkAccess(req);
   if (denied) return denied;
 
   let body;

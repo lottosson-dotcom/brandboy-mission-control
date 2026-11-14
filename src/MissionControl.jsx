@@ -3,9 +3,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PdfChip } from "./components/PdfAttach.jsx";
 import { readPdf } from "./lib/pdf.js";
-import { readSavedPasscode, savePasscode, askForPasscode } from "./lib/passcode.js";
+import { accessHeaders, accessRefused, loginEnabled, logOut } from "./lib/auth.js";
 import ActivityLog from "./components/ActivityLog.jsx";
 import DailyTasks from "./components/DailyTasks.jsx";
+import Contacts from "./components/Contacts.jsx";
+import Inbox from "./components/Inbox.jsx";
 // Agent memory is switched off until login is added (docs/PLAN.md, phase 2).
 const saveMemory = async () => {};
 const C = {
@@ -31,26 +33,15 @@ import { AGENTS, QUICK_TASKS } from "./agents.js";
 // onProgress(textSoFar) is called while the answer streams in, so the chat can
 // show the words as they're written. Returns the final, complete answer.
 async function askAgent(agent, messages, onProgress, isRetry = false) {
-  const code =
-    (!isRetry && readSavedPasscode()) ||
-    askForPasscode(
-      isRetry
-        ? "That passcode didn't work. Paste the Mission Control passcode again:"
-        : "Enter the Mission Control passcode",
-    );
-  if (!code)
-    throw new Error(
-      "No passcode entered. Your message is back in the box: press Send to try again.",
-    );
+  const access = await accessHeaders(isRetry);
   const res = await fetch("/api/ask-agent", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-app-passcode": code },
+    headers: { "Content-Type": "application/json", ...access },
     body: JSON.stringify({ agentId: agent.id, messages }),
   });
-  if (res.status === 401) {
-    savePasscode("");
-    if (!isRetry) return askAgent(agent, messages, onProgress, true);
-    throw new Error("Wrong passcode. Your message is back in the box: press Send to try again.");
+  if (res.status === 401 || res.status === 403) {
+    if ((await accessRefused()) && !isRetry) return askAgent(agent, messages, onProgress, true);
+    throw new Error("Not allowed in. Your message is back in the box: log in and press Send.");
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -372,7 +363,15 @@ export default function MissionControl() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState("chat");
+  // Coming back from Google's "Connect Gmail" screen (?gmail=connected etc.):
+  // open the Inbox tab and show what happened, then tidy the address bar.
+  const [gmailResult, setGmailResult] = useState(() =>
+    new URLSearchParams(window.location.search).get("gmail"),
+  );
+  const [view, setView] = useState(gmailResult ? "inbox" : "chat");
+  useEffect(() => {
+    if (gmailResult) window.history.replaceState(null, "", window.location.pathname);
+  }, [gmailResult]);
   const [time, setTime] = useState(new Date());
   const chatScrollRef = useRef(null);
   useEffect(() => {
@@ -575,6 +574,8 @@ export default function MissionControl() {
           ["chat", "💬 Talk to Agent"],
           ["agents", "🤖 All Agents"],
           ["strategy", "📋 Strategy"],
+          ["inbox", "📥 Inbox"],
+          ["contacts", "👥 Contacts"],
           ["tasks", "🕕 Daily Tasks"],
           ["activity", "📡 Activity Log"],
         ].map(([v, label]) => (
@@ -664,6 +665,24 @@ export default function MissionControl() {
               <div style={{ fontWeight: 700, fontSize: 12 }}>Lars</div>
               <div style={{ fontSize: 10, color: C.muted }}>Commander · Brandboy</div>
             </div>
+            {loginEnabled && (
+              <button
+                onClick={logOut}
+                title="Log out of Mission Control on this device"
+                style={{
+                  marginLeft: "auto",
+                  background: "none",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  color: C.muted,
+                  fontSize: 11,
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                }}
+              >
+                Log out
+              </button>
+            )}
           </div>
         </div>
         <div
@@ -1190,6 +1209,10 @@ export default function MissionControl() {
               ))}
             </div>
           )}
+          {view === "inbox" && (
+            <Inbox result={gmailResult} onResultShown={() => setGmailResult(null)} />
+          )}
+          {view === "contacts" && <Contacts />}
           {view === "tasks" && <DailyTasks />}
           {view === "activity" && <ActivityLog />}
         </div>

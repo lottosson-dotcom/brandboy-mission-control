@@ -5,12 +5,12 @@
 // POST /api/run-scans?id=<task id> runs just that one task (even if it's off)
 // Needs the passcode. Handy for testing a new task straight away.
 // =============================================================================
-import { reply, checkPasscode, databaseIsSetUp, TableMissingError } from "../lib/server.js";
+import { reply, checkAccess, databaseIsSetUp, TableMissingError } from "../lib/server.js";
 import { runTasks } from "../lib/scans.js";
 
 export default async (req) => {
   if (req.method !== "POST") return reply(405, { error: "Method not allowed" });
-  const denied = checkPasscode(req);
+  const denied = await checkAccess(req);
   if (denied) return denied;
   if (!databaseIsSetUp()) {
     return reply(400, {
