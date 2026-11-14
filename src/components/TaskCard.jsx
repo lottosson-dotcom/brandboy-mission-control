@@ -7,29 +7,7 @@
 import { useState } from "react";
 import { AGENTS } from "../agents.js";
 import { saveTask, removeTask, runTasksNow } from "../lib/activityLog.js";
-
-const MUTED = "#A3A3A3";
-const BORDER = "#2A2A2A";
-const field = {
-  width: "100%",
-  background: "#141414",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 8,
-  color: "#F0F0F0",
-  padding: "8px 10px",
-  fontSize: 14,
-  fontFamily: "inherit",
-};
-const button = (color, filled) => ({
-  background: filled ? color : "#141414",
-  border: `1px solid ${filled ? color : BORDER}`,
-  color: filled ? "#fff" : color,
-  borderRadius: 6,
-  padding: "6px 12px",
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: "pointer",
-});
+import { MUTED, BORDER, field, button } from "../lib/styles.js";
 
 export default function TaskCard({ task, onSaved, onDeleted }) {
   const [draft, setDraft] = useState(task);

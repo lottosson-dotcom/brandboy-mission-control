@@ -5,11 +5,11 @@
 // Needs the passcode, like the chat. Entries are written by ask-agent.js after
 // each answer. See netlify/lib/server.js for the database settings.
 // =============================================================================
-import { reply, checkPasscode, databaseIsSetUp, readActivity } from "../lib/server.js";
+import { reply, checkAccess, databaseIsSetUp, readActivity } from "../lib/server.js";
 
 export default async (req) => {
   if (req.method !== "GET") return reply(405, { error: "Method not allowed" });
-  const denied = checkPasscode(req);
+  const denied = await checkAccess(req);
   if (denied) return denied;
   if (!databaseIsSetUp()) return reply(200, { entries: [], notSetUp: true });
   try {
