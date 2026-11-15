@@ -8,6 +8,7 @@ export const MUTED = "#A3A3A3";
 export const BORDER = "#2A2A2A";
 export const ACCENT = "#FF6B2B";
 export const RED = "#EF4444";
+export const GREEN = "#22C55E";
 
 // A text box, drop-down or text area.
 export const field = {
