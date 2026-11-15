@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { AGENTS } from "../agents.js";
 import { saveTask, removeTask, runTasksNow } from "../lib/activityLog.js";
-import { MUTED, BORDER, field, button } from "../lib/styles.js";
+import { MUTED, BORDER, ACCENT, RED, GREEN, field, button } from "../lib/styles.js";
 
 export default function TaskCard({ task, onSaved, onDeleted }) {
   const [draft, setDraft] = useState(task);
@@ -44,7 +44,7 @@ export default function TaskCard({ task, onSaved, onDeleted }) {
   };
 
   const runNow = () =>
-    act("Running… about 30 seconds", async () => {
+    act(`⏳ ${agent.name} is working on it… this takes about 30 seconds.`, async () => {
       const [result] = await runTasksNow(task.id);
       setNote(
         result?.ok
@@ -108,13 +108,10 @@ export default function TaskCard({ task, onSaved, onDeleted }) {
           />
           Runs every morning
         </label>
-        <span style={{ fontSize: 12, color: note.startsWith("⚠️") ? "#EF4444" : MUTED }}>
-          {busy || note}
-        </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           {!isNew && !changed && (
-            <button onClick={runNow} disabled={!!busy} style={button("#FF6B2B", false)}>
-              ▶ Run now
+            <button onClick={runNow} disabled={!!busy} style={button(ACCENT, !!busy)}>
+              {busy.startsWith("⏳") ? "⏳ Running…" : "▶ Run now"}
             </button>
           )}
           <button onClick={remove} disabled={!!busy} style={button(MUTED, false)}>
@@ -127,6 +124,29 @@ export default function TaskCard({ task, onSaved, onDeleted }) {
           )}
         </div>
       </div>
+      {(busy || note) && <StatusBar text={busy || note} />}
+    </div>
+  );
+}
+
+// A clear coloured line under the task, so Lars can't miss what's happening:
+// orange while working, green when done, red when something went wrong.
+function StatusBar({ text }) {
+  const color = text.startsWith("⚠️") ? RED : text.startsWith("✓") ? GREEN : ACCENT;
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "10px 12px",
+        borderRadius: 8,
+        border: `1px solid ${color}`,
+        background: "#141414",
+        color,
+        fontSize: 14,
+        fontWeight: 700,
+      }}
+    >
+      {text}
     </div>
   );
 }
