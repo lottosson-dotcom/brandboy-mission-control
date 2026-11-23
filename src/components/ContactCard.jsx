@@ -29,7 +29,7 @@ export function KindBadge({ kind }) {
   );
 }
 
-export default function ContactCard({ contact, onSaved, onDeleted }) {
+export default function ContactCard({ contact, onSaved, onDeleted, ticked, onTick }) {
   const isNew = !contact.id;
   const [open, setOpen] = useState(isNew);
   const [draft, setDraft] = useState(contact);
@@ -81,15 +81,24 @@ export default function ContactCard({ contact, onSaved, onDeleted }) {
         style={{
           display: "grid",
           gridTemplateColumns:
-            "90px minmax(120px,1.4fr) minmax(100px,1fr) minmax(140px,1.4fr) 120px",
+            "20px 90px minmax(120px,1.4fr) minmax(100px,1fr) minmax(140px,1.4fr) 120px",
           gap: 10,
           alignItems: "center",
           padding: "9px 12px",
           borderBottom: `1px solid ${BORDER}`,
           fontSize: 13,
           cursor: "pointer",
+          background: ticked ? "#1A1A1A" : "transparent",
         }}
       >
+        {/* Ticking doesn't open the contact: that's what clicking the rest of the line does. */}
+        <input
+          type="checkbox"
+          checked={!!ticked}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => onTick(contact.id)}
+          title="Tick to change or delete several at once"
+        />
         <KindBadge kind={contact.kind} />
         <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {contact.company || "—"}

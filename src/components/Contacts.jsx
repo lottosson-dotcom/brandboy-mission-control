@@ -9,6 +9,7 @@ import { KINDS, fetchContacts } from "../lib/contacts.js";
 import { MUTED, BORDER, ACCENT, RED, field, button, bigButton } from "../lib/styles.js";
 import ContactCard from "./ContactCard.jsx";
 import ContactImport from "./ContactImport.jsx";
+import ContactBulkBar from "./ContactBulkBar.jsx";
 
 const SHOW_AT_ONCE = 200;
 
@@ -19,6 +20,7 @@ export default function Contacts() {
   const [kind, setKind] = useState("all");
   const [search, setSearch] = useState("");
   const [importing, setImporting] = useState(false);
+  const [ticked, setTicked] = useState(new Set()); // ids of the ticked contacts
 
   async function load() {
     setState("loading");
@@ -67,6 +69,19 @@ export default function Contacts() {
           ))),
   );
   const count = (k) => contacts.filter((c) => c.id && c.kind === k).length;
+
+  // Ticking. "Tick all" means everyone matching the current filter and search,
+  // including those beyond the first 200 on screen.
+  const tickable = shown.filter((c) => c.id).map((c) => c.id);
+  const allTicked = tickable.length > 0 && tickable.every((id) => ticked.has(id));
+  const tick = (id) => {
+    const next = new Set(ticked);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setTicked(next);
+  };
+  const tickAll = () => setTicked(allTicked ? new Set() : new Set(tickable));
+  const tickedIds = contacts.filter((c) => c.id && ticked.has(c.id)).map((c) => c.id);
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
@@ -141,6 +156,32 @@ export default function Contacts() {
               style={{ ...field, width: 260, marginLeft: "auto" }}
             />
           </div>
+          {tickable.length > 0 && (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                color: MUTED,
+                margin: "0 0 10px 12px",
+                cursor: "pointer",
+              }}
+            >
+              <input type="checkbox" checked={allTicked} onChange={tickAll} />
+              {allTicked ? "Untick all" : `Tick all ${tickable.length} shown`}
+            </label>
+          )}
+          {tickedIds.length > 0 && (
+            <ContactBulkBar
+              ids={tickedIds}
+              onClear={() => setTicked(new Set())}
+              onDone={() => {
+                setTicked(new Set());
+                load();
+              }}
+            />
+          )}
           {contacts.length === 0 && (
             <div style={{ color: MUTED, lineHeight: 1.6 }}>
               No contacts yet. Press <b>⬆ Import from Excel</b> to bring in your customer and
@@ -152,7 +193,14 @@ export default function Contacts() {
           )}
           <div style={{ borderTop: shown.length ? `1px solid ${BORDER}` : "none" }}>
             {shown.slice(0, SHOW_AT_ONCE).map((c) => (
-              <ContactCard key={c.key || c.id} contact={c} onSaved={replace} onDeleted={drop} />
+              <ContactCard
+                key={c.key || c.id}
+                contact={c}
+                onSaved={replace}
+                onDeleted={drop}
+                ticked={ticked.has(c.id)}
+                onTick={tick}
+              />
             ))}
           </div>
           {shown.length > SHOW_AT_ONCE && (

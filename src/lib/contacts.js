@@ -40,6 +40,15 @@ export function removeContact(id) {
   return callApi(`/api/contacts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+// The tick-box actions. Returns { changed } or { deleted }.
+export function changeKindOf(ids, kind) {
+  return callApi("/api/contacts?bulk=1", { method: "POST", body: { ids, kind } });
+}
+
+export function removeMany(ids) {
+  return callApi("/api/contacts?bulk=1", { method: "POST", body: { ids, delete: true } });
+}
+
 // Returns { added, skipped, problems }.
 export function importContacts(contacts) {
   return callApi("/api/contacts?import=1", { method: "POST", body: { contacts } });
