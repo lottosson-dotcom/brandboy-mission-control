@@ -221,6 +221,30 @@ export async function deleteContact(id) {
   return rows.length > 0;
 }
 
+// Changes or deletes many contacts at once (the tick boxes on the Contacts tab).
+// Done in groups of 100 so the request address doesn't get too long.
+// Returns how many contacts were changed or deleted.
+async function forEachGroup(ids, work) {
+  let done = 0;
+  for (let i = 0; i < ids.length; i += 100) {
+    const list = ids
+      .slice(i, i + 100)
+      .map(encodeURIComponent)
+      .join(",");
+    done += (await work(`contacts?id=in.(${list})`)).length;
+  }
+  return done;
+}
+
+export function updateContacts(ids, changes) {
+  const body = { ...changes, updated_at: new Date().toISOString() };
+  return forEachGroup(ids, (path) => dbRequest(path, { method: "PATCH", body }));
+}
+
+export function deleteContacts(ids) {
+  return forEachGroup(ids, (path) => dbRequest(path, { method: "DELETE" }));
+}
+
 // ---- Gmail connection (table created by docs/supabase/gmail_connection.sql) ---
 
 export async function readGmailConnection() {

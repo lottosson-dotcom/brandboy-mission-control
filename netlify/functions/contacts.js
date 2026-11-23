@@ -6,6 +6,7 @@
 //   POST   /api/contacts?import=1   add many       { contacts: [ … ] }  (the Excel import)
 //   PATCH  /api/contacts?id=…       change one
 //   DELETE /api/contacts?id=…       remove one
+//   POST   /api/contacts?bulk=1     many at once   { ids: [ … ], kind } or { ids: [ … ], delete: true }
 // Contacts are checked here so a bad row can't save rubbish. The import skips
 // anyone already saved (same email, or same company + name when there's no
 // email), so running it twice doesn't make doubles.
@@ -18,6 +19,8 @@ import {
   createContacts,
   updateContact,
   deleteContact,
+  updateContacts,
+  deleteContacts,
   TableMissingError,
 } from "../lib/server.js";
 
@@ -84,6 +87,19 @@ async function importMany(rows) {
   return reply(200, { added: toAdd.length, skipped, problems: problems.slice(0, 20) });
 }
 
+// The tick-box actions: change the type of, or delete, many contacts at once.
+const ID = /^[0-9a-f-]{36}$/i;
+export async function bulk(input) {
+  const ids = Array.isArray(input.ids) ? input.ids.filter((id) => ID.test(String(id))) : [];
+  if (ids.length === 0) return reply(400, { error: "No contacts were ticked." });
+  if (ids.length > MAX_IMPORT) return reply(400, { error: "That's too many at once." });
+  if (input.delete === true) return reply(200, { deleted: await deleteContacts(ids) });
+  if (!KINDS.includes(input.kind)) {
+    return reply(400, { error: "Type must be customer, supplier or prospect." });
+  }
+  return reply(200, { changed: await updateContacts(ids, { kind: input.kind }) });
+}
+
 export default async (req) => {
   const denied = await checkAccess(req);
   if (denied) return denied;
@@ -105,6 +121,7 @@ export default async (req) => {
     if (!input || typeof input !== "object") return reply(400, { error: "Invalid request" });
 
     if (req.method === "POST" && params.get("import")) return await importMany(input.contacts);
+    if (req.method === "POST" && params.get("bulk")) return await bulk(input);
 
     if (req.method === "POST") {
       const { contact, problem } = cleanContact(input);
